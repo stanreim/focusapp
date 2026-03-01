@@ -3,9 +3,10 @@ import { useState, useEffect } from 'react';
 interface LiveClockProps {
   isTimerActive?: boolean;
   timeRemaining?: number | null; // in milliseconds
+  draggedMinutes?: number | null; // minutes from drag
 }
 
-export function LiveClock({ isTimerActive, timeRemaining }: LiveClockProps) {
+export function LiveClock({ isTimerActive, timeRemaining, draggedMinutes }: LiveClockProps) {
   const [time, setTime] = useState(new Date());
 
   useEffect(() => {
@@ -26,6 +27,11 @@ export function LiveClock({ isTimerActive, timeRemaining }: LiveClockProps) {
     hours = Math.floor(totalSeconds / 3600);
     minutes = Math.floor((totalSeconds % 3600) / 60);
     seconds = totalSeconds % 60;
+  } else if (draggedMinutes !== null && draggedMinutes !== undefined) {
+    // Use dragged minutes when dragging
+    minutes = draggedMinutes;
+    hours = Math.floor(minutes / 60) % 12;
+    seconds = 0;
   } else {
     // Standard clock logic
     hours = time.getHours() % 12;
@@ -54,6 +60,8 @@ export function LiveClock({ isTimerActive, timeRemaining }: LiveClockProps) {
   const minuteHandWidth = isMobile ? 81.66 : 116.66;
   const handHeight = isMobile ? 1.875 : 2.675;
 
+  const isDragging = draggedMinutes !== null && draggedMinutes !== undefined;
+
   return (
     <>
       {/* Hour hand */}
@@ -63,7 +71,7 @@ export function LiveClock({ isTimerActive, timeRemaining }: LiveClockProps) {
           left: `${centerX}px`,
           top: `${centerY}px`,
           transform: `rotate(${hourAngle}deg)`,
-          transition: 'transform 1s cubic-bezier(0.4, 0, 0.2, 1)', // Smooth transition
+          transition: isDragging ? 'none' : 'transform 1s cubic-bezier(0.4, 0, 0.2, 1)', // Smooth transition
         }}
       >
         <div className="bg-black" style={{ height: `${handHeight}px`, width: `${hourHandWidth}px` }} />
@@ -76,7 +84,7 @@ export function LiveClock({ isTimerActive, timeRemaining }: LiveClockProps) {
           left: `${centerX}px`,
           top: `${centerY}px`,
           transform: `rotate(${minuteAngle}deg)`,
-          transition: 'transform 1s linear', // Linear for seconds/continuous movement
+          transition: isDragging ? 'none' : 'transform 1s linear', // Linear for seconds/continuous movement
         }}
       >
         <div className="bg-black" style={{ height: `${handHeight}px`, width: `${minuteHandWidth}px` }} />

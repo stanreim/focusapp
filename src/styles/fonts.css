@@ -1,0 +1,13 @@
+/* Body Cue font - fallback to system monospace if not available */
+@font-face {
+  font-family: 'Body_Cue';
+  src: local('Body Cue'), local('BodyCue'), local('Body-Cue');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* Fallback font stack for Body Cue */
+.font-body-cue {
+  font-family: 'Body_Cue', 'SF Mono', 'Monaco', 'Inconsolata', 'Fira Code', 'Courier New', monospace;
+}

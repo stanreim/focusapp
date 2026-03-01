@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { AudioPlayer } from '@/app/components/AudioPlayer';
-import { TimerSelector } from '@/app/components/TimerSelector';
+import { AudioPlayer, AudioPlayerRef } from '@/app/components/AudioPlayer';
 import { HomeWrapper } from '@/app/components/HomeWrapper';
 import { SoundPickerModal } from '@/app/components/SoundPickerModal';
 import { Waves } from '@/components/ui/wave-background';
@@ -35,14 +34,36 @@ export default function App() {
   const [sessionLength, setSessionLength] = useState<number | null>(null);
   const [startTime, setStartTime] = useState<number | null>(null);
   const [timeRemaining, setTimeRemaining] = useState<number | null>(null);
-  const [showTimerSelector, setShowTimerSelector] = useState(false);
   const [sessionEnded, setSessionEnded] = useState(false);
+  const [draggedMinutes, setDraggedMinutes] = useState<number | null>(null);
+  const [showTimerSelector, setShowTimerSelector] = useState(false);
   const [volume, setVolume] = useState(0.7); // Default volume 70%
   const [showSoundPicker, setShowSoundPicker] = useState(false);
-  const [customSongs, setCustomSongs] = useState<Song[]>([]);
-  const [selectedSongId, setSelectedSongId] = useState<string>('mood-0');
+  const [customSongs, setCustomSongs] = useState<Song[]>(() => {
+    // Load custom songs from localStorage on initial render
+    try {
+      const saved = localStorage.getItem('focusApp_customSongs');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+  const [selectedSongId, setSelectedSongId] = useState<string>(() => {
+    // Load selected song from localStorage on initial render
+    try {
+      const saved = localStorage.getItem('focusApp_selectedSongId');
+      return saved || 'song-1';
+    } catch {
+      return 'song-1';
+    }
+  });
   const [showVolumeFeedback, setShowVolumeFeedback] = useState(false);
   const volumeFeedbackTimerRef = useRef<NodeJS.Timeout | null>(null);
+  
+  // Audio player state for UI
+  const [audioCurrentTime, setAudioCurrentTime] = useState(0);
+  const [audioDuration, setAudioDuration] = useState(0);
+  const audioPlayerRef = useRef<AudioPlayerRef>(null);
   
   // Gestures
   const longPressTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -68,15 +89,15 @@ export default function App() {
   const moods = [
     {
       video: '/assets/mood-0.mp4',
-      audio: 'https://www.dropbox.com/scl/fi/s6jert3fai3mhx8jio2e3/mood-0.mp3?rlkey=lthz8hr75wqb7ektd49eg62vz&st=mf5lpabu&dl=1',
+      audio: '/assets/mood-0.mp3',
     },
     {
       video: '/assets/mood-1.mp4',
-      audio: null, // Generated
+      audio: '/assets/mood-1.mp3',
     },
     {
-      video: '/assets/mood-2.mp3',
-      audio: null, // Generated
+      video: '/assets/mood-2.mp4',
+      audio: '/assets/mood-2.mp3',
     },
     {
       video: '/assets/mood-3.mp4',
@@ -84,34 +105,81 @@ export default function App() {
     },
   ];
 
-  // Create song list for picker
+  // Helper function to generate consistent image URL for songs
+  const getSongImageUrl = (songId: string, songName: string): string => {
+    const FALLBACK_IMAGES = [
+      "https://images.unsplash.com/photo-1760346738721-235e811f573d?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxsby1maSUyMGFic3RyYWN0JTIwYmFja2dyb3VuZHxlbnwxfHx8fDE3Njk4MDYxMzF8MA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral",
+      "https://images.unsplash.com/photo-1736176421274-546a4eaf57d6?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxhYnN0cmFjdCUyMG11c2ljJTIwd2F2ZWZvcm1zJTIwZ3JhZGllbnR8ZW58MXx8fHwxNzY5ODA2MTMxfDA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral",
+      "https://images.unsplash.com/photo-1765046255479-669cf07a0230?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxtaW5pbWFsaXN0JTIwc291bmQlMjB3YXZlc3xlbnwxfHx8fDE3Njk4MDYxMzF8MA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral",
+      "https://images.unsplash.com/photo-1682943827405-6261f5540d68?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxhYnN0cmFjdCUyMGF1ZGlvJTIwc3BlY3RydW18ZW58MXx8fHwxNzY5ODA2MTMxfDA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral"
+    ];
+    let hash = 0;
+    const str = songId || songName || 'default';
+    for (let i = 0; i < str.length; i++) {
+      hash = ((hash << 5) - hash) + str.charCodeAt(i);
+      hash |= 0;
+    }
+    const index = Math.abs(hash) % FALLBACK_IMAGES.length;
+    return FALLBACK_IMAGES[index];
+  };
+
+  // Create song list for picker - using actual audio files from assets
   const allSongs: Song[] = [
     {
-      id: 'mood-0',
-      name: 'Ambient Focus',
+      id: 'song-1',
+      name: '3 Petits Bouts de Choux (Cover)',
       duration: '∞',
-      audioUrl: moods[0].audio || '',
+      audioUrl: '/assets/3 Petits Bouts de Choux (Cover).mp3',
+      imageUrl: getSongImageUrl('song-1', '3 Petits Bouts de Choux (Cover)'),
     },
     {
-      id: 'mood-1',
-      name: 'Deep Concentration',
+      id: 'song-2',
+      name: 'Dreams of Glass',
       duration: '∞',
-      audioUrl: moods[1].audio || '',
+      audioUrl: '/assets/Dreams of Glass.mp3',
+      imageUrl: getSongImageUrl('song-2', 'Dreams of Glass'),
     },
     {
-      id: 'mood-2',
-      name: 'Calm Clarity',
+      id: 'song-3',
+      name: 'Vive le Plein air',
       duration: '∞',
-      audioUrl: moods[2].audio || '',
+      audioUrl: '/assets/Vive le Plein air.mp3',
+      imageUrl: getSongImageUrl('song-3', 'Vive le Plein air'),
     },
     {
-      id: 'mood-3',
-      name: 'Night Flow',
+      id: 'song-4',
+      name: 'Funcky Day Cover',
       duration: '∞',
-      audioUrl: moods[3].audio || '',
+      audioUrl: '/assets/Funcky Day Cover.mp3',
+      imageUrl: getSongImageUrl('song-4', 'Funcky Day Cover'),
+    },
+    {
+      id: 'song-5',
+      name: 'Sabe Jogar Cover',
+      duration: '∞',
+      audioUrl: '/assets/Sabe Jogar Cover.mp3',
+      imageUrl: getSongImageUrl('song-5', 'Sabe Jogar Cover'),
     },
     ...customSongs,
   ];
+
+  // Save custom songs to localStorage whenever they change
+  useEffect(() => {
+    try {
+      localStorage.setItem('focusApp_customSongs', JSON.stringify(customSongs));
+    } catch (e) {
+      console.warn('Failed to save custom songs to localStorage:', e);
+    }
+  }, [customSongs]);
+
+  // Save selected song to localStorage whenever it changes
+  useEffect(() => {
+    try {
+      localStorage.setItem('focusApp_selectedSongId', selectedSongId);
+    } catch (e) {
+      console.warn('Failed to save selected song to localStorage:', e);
+    }
+  }, [selectedSongId]);
 
   // Update time remaining
   useEffect(() => {
@@ -125,6 +193,8 @@ export default function App() {
         setTimeRemaining(0);
         setSessionEnded(true);
         setIsPlaying(false);
+        // Play triumphant success sound when session completes
+        hapticSounds.success();
         clearInterval(interval);
       } else {
         setTimeRemaining(remaining);
@@ -138,17 +208,52 @@ export default function App() {
 
   const handleTimerButtonClick = () => {
     if (!isTimerActive) {
-      setIsTimerActive(true);
-      setShowTimerSelector(true);
+      // Toggle focus mode on - show timer selector for user to choose time
+      // If selector is already showing, hide it (toggle off)
+      if (showTimerSelector) {
+        setShowTimerSelector(false);
+      } else {
+        setShowTimerSelector(true);
+      }
     } else {
-      // Stop button - reset everything
+      // Toggle focus mode off - reset everything
       setIsTimerActive(false);
       setIsPlaying(false);
       setSessionLength(null);
       setStartTime(null);
       setTimeRemaining(null);
       setSessionEnded(false);
+      setShowTimerSelector(false);
     }
+  };
+
+  const handleTimeButtonClick = (minutes: number) => {
+    // Start timer with selected duration
+    setIsTimerActive(true);
+    setShowTimerSelector(false); // Hide selector once time is selected
+    setSessionLength(minutes * 60 * 1000);
+    setStartTime(Date.now());
+    setTimeRemaining(minutes * 60 * 1000);
+    setIsPlaying(true);
+    hapticSounds.thud();
+  };
+
+  const handleMinuteHandDrag = (minutes: number) => {
+    // Update preview while dragging
+    setDraggedMinutes(minutes);
+  };
+
+  const handleMinuteHandDragEnd = (minutes: number) => {
+    // Start timer with dragged duration
+    setIsTimerActive(true);
+    setShowTimerSelector(false); // Hide selector once time is selected
+    const duration = minutes * 60 * 1000;
+    setSessionLength(duration);
+    setStartTime(Date.now());
+    setTimeRemaining(duration);
+    setIsPlaying(true);
+    setDraggedMinutes(null); // Reset drag preview
+    hapticSounds.thud();
   };
 
   const handleClockClick = () => {
@@ -157,15 +262,9 @@ export default function App() {
     // Cycle to next mood (0-3)
     const nextMood = (currentMood + 1) % moods.length;
     setCurrentMood(nextMood);
-    
-    // Only update song if currently on a mood song (not custom)
-    if (selectedSongId.startsWith('mood-')) {
-      setSelectedSongId(`mood-${nextMood}`);
-    }
   };
 
   const handlePointerDown = () => {
-    if (!isTimerActive) return;
     isLongPressRef.current = false;
     if (longPressTimerRef.current) clearTimeout(longPressTimerRef.current);
     longPressTimerRef.current = setTimeout(() => {
@@ -184,8 +283,6 @@ export default function App() {
   const handleScreenClick = (e: React.MouseEvent) => {
     if (isLoading) return; // Ignore clicks during loading
 
-    // Don't toggle play/pause if clicking on UI elements or timer selector
-    if (showTimerSelector) return;
     
     // Ignore click if it was a long press
     if (isLongPressRef.current) {
@@ -214,7 +311,7 @@ export default function App() {
 
   const handleWheel = (e: React.WheelEvent) => {
     if (isLoading) return;
-    if (!isTimerActive || showTimerSelector) return;
+    if (!isTimerActive) return;
     
     // Normalize delta
     const delta = e.deltaY * -0.001; 
@@ -227,16 +324,14 @@ export default function App() {
     volumeFeedbackTimerRef.current = setTimeout(() => setShowVolumeFeedback(false), 1500);
   };
 
-  const handleTimerSelected = (minutes: number) => {
-    setSessionLength(minutes * 60 * 1000);
-    setStartTime(Date.now());
-    setTimeRemaining(minutes * 60 * 1000);
-    setShowTimerSelector(false);
-    setIsPlaying(true);
-  };
 
   const handleVolumePlayPause = () => {
+    // Allow playing audio even when timer isn't active
     setIsPlaying(!isPlaying);
+    // If starting to play and timer isn't active, ensure we have a selected song
+    if (!isPlaying && !isTimerActive) {
+      // Audio will play automatically when isPlaying becomes true
+    }
   };
 
   const handleVolumeChange = (newVolume: number) => {
@@ -265,11 +360,44 @@ export default function App() {
     setCustomSongs([...customSongs, song]);
     setSelectedSongId(song.id);
     setShowSoundPicker(false);
+    // Auto-play when adding a custom song
+    if (!isPlaying) {
+      setIsPlaying(true);
+    }
   };
 
   const handleSelectSong = (songId: string) => {
     setSelectedSongId(songId);
     setShowSoundPicker(false);
+    // Always start playing when a song is selected from the picker
+    if (!isPlaying) {
+      setIsPlaying(true);
+    }
+  };
+
+  const handleDeleteSong = (songId: string) => {
+    // Remove the song from customSongs
+    setCustomSongs(prev => prev.filter(song => song.id !== songId));
+    // If the deleted song was selected, switch to the first default song
+    if (selectedSongId === songId) {
+      setSelectedSongId('song-1');
+    }
+  };
+
+  const handleAudioProgress = (currentTime: number) => {
+    setAudioCurrentTime(currentTime);
+  };
+
+  const handleAudioDuration = (duration: number) => {
+    setAudioDuration(duration);
+  };
+
+  const handleAudioSeek = (progress: number) => {
+    if (audioPlayerRef.current) {
+      audioPlayerRef.current.seek(progress);
+      // Update local state immediately for responsive UI
+      setAudioCurrentTime(progress * audioDuration);
+    }
   };
 
   // Get current audio source based on selected song
@@ -336,10 +464,13 @@ export default function App() {
         {/* Background Layer - Hidden in focus mode */}
 
         <AudioPlayer
+          ref={audioPlayerRef}
           src={getCurrentAudioSource()}
           isPlaying={isPlaying}
           moodKey={currentMood}
           volume={volume}
+          onProgress={handleAudioProgress}
+          onDuration={handleAudioDuration}
         />
 
         {/* Home UI - always visible */}
@@ -370,22 +501,23 @@ export default function App() {
             onVolumeLongPress={handleOpenSoundPicker}
             timeRemaining={timeRemaining}
             onClockClick={handleClockClick}
+            onTimeButtonClick={handleTimeButtonClick}
+            onMinuteHandDrag={handleMinuteHandDrag}
+            onMinuteHandDragEnd={handleMinuteHandDragEnd}
+            draggedMinutes={draggedMinutes}
+            showTimerSelector={showTimerSelector}
             themeMode={themeMode}
             onToggleDarkMode={handleToggleDarkMode}
+            songName={allSongs.find(s => s.id === selectedSongId)?.name || 'Song Name'}
+            currentTime={audioCurrentTime}
+            duration={audioDuration}
+            onSeek={handleAudioSeek}
+            albumArtUrl={allSongs.find(s => s.id === selectedSongId)?.imageUrl}
+            audioPlayerRef={audioPlayerRef}
           />
         </HomeWrapper>
         </div>
 
-        {/* Timer selector overlay */}
-        {showTimerSelector && (
-          <TimerSelector
-            onSelect={handleTimerSelected}
-            onCancel={() => {
-              setShowTimerSelector(false);
-              setIsTimerActive(false);
-            }}
-          />
-        )}
 
         {/* Sound picker modal */}
         {showSoundPicker && (
@@ -395,6 +527,7 @@ export default function App() {
             songs={allSongs}
             onAddSong={handleAddSong}
             onSelectSong={handleSelectSong}
+            onDeleteSong={handleDeleteSong}
             selectedSongId={selectedSongId}
           />
         )}

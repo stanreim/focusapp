@@ -17,6 +17,7 @@ interface SoundPickerModalProps {
   songs: Song[];
   onAddSong: (song: Song) => void;
   onSelectSong: (songId: string) => void;
+  onDeleteSong?: (songId: string) => void;
   selectedSongId?: string;
 }
 
@@ -26,6 +27,7 @@ export function SoundPickerModal({
   songs, 
   onAddSong, 
   onSelectSong,
+  onDeleteSong,
   selectedSongId 
 }: SoundPickerModalProps) {
   const [customLink, setCustomLink] = useState('');
@@ -40,21 +42,137 @@ export function SoundPickerModal({
     }
   }, [isOpen]);
 
-  // Clean the URL to remove tracking params and whitespace
+  // Clean the URL to remove tracking params while preserving essential ones
+  // Also convert youtu.be short links to full youtube.com URLs for better compatibility
   const cleanUrl = (url: string): string => {
     try {
         const urlObj = new URL(url.trim());
-        // Return origin + pathname (strips query params like utm_source)
-        // We keep hash if it exists just in case, but usually not needed for audio
+        
+        // For YouTube, preserve the video ID
+        if (urlObj.hostname.includes('youtube.com')) {
+          const videoId = urlObj.searchParams.get('v');
+          if (videoId) {
+            return `https://www.youtube.com/watch?v=${videoId}`;
+          }
+        }
+        
+        // For youtu.be short links, convert to full youtube.com URL for better compatibility
+        if (urlObj.hostname === 'youtu.be') {
+          const videoId = urlObj.pathname.slice(1); // Remove leading slash
+          if (videoId) {
+            return `https://www.youtube.com/watch?v=${videoId}`;
+          }
+        }
+        
+        // For other URLs, strip tracking params but keep the URL functional
         return urlObj.origin + urlObj.pathname;
     } catch (e) {
         return url.trim();
     }
   };
 
-  const validateAudioLink = (url: string): boolean => {
+  // Extract YouTube video ID from URL
+  const getYouTubeVideoId = (url: string): string | null => {
+    try {
+      const urlObj = new URL(url);
+      // Handle youtu.be short links
+      if (urlObj.hostname === 'youtu.be') {
+        return urlObj.pathname.slice(1); // Remove leading slash
+      }
+      // Handle youtube.com links
+      if (urlObj.hostname.includes('youtube.com')) {
+        return urlObj.searchParams.get('v');
+      }
+    } catch (e) {
+      // Not a valid URL
+    }
+    return null;
+  };
+
+  // Get YouTube thumbnail URL
+  const getYouTubeThumbnail = (url: string): string | null => {
+    const videoId = getYouTubeVideoId(url);
+    if (videoId) {
+      return `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`;
+    }
+    return null;
+  };
+
+  // Platforms actually supported by react-player v3
+  const SUPPORTED_STREAMING_PLATFORMS: { pattern: RegExp; name: string }[] = [
+    { pattern: /youtu\.?be/i, name: 'YouTube' },
+    { pattern: /vimeo\.com/i, name: 'Vimeo' },
+    { pattern: /wistia\.com/i, name: 'Wistia' },
+    { pattern: /mux\.com/i, name: 'Mux' },
+  ];
+
+  // Platforms that users might try but are NOT supported
+  const UNSUPPORTED_PLATFORMS: { pattern: RegExp; name: string; reason: string }[] = [
+    { pattern: /spotify\.com/i, name: 'Spotify', reason: 'Spotify requires authentication and Premium account' },
+    { pattern: /soundcloud\.com/i, name: 'SoundCloud', reason: 'SoundCloud is not supported in this version' },
+    { pattern: /apple\.com\/music/i, name: 'Apple Music', reason: 'Apple Music requires authentication' },
+    { pattern: /tidal\.com/i, name: 'Tidal', reason: 'Tidal requires authentication' },
+    { pattern: /deezer\.com/i, name: 'Deezer', reason: 'Deezer requires authentication' },
+    { pattern: /facebook\.com/i, name: 'Facebook', reason: 'Facebook videos are not supported' },
+    { pattern: /twitch\.tv/i, name: 'Twitch', reason: 'Twitch is not supported' },
+    { pattern: /dailymotion\.com/i, name: 'Dailymotion', reason: 'Dailymotion is not supported' },
+    { pattern: /mixcloud\.com/i, name: 'Mixcloud', reason: 'Mixcloud is not supported' },
+  ];
+
+  // Check if URL is a supported streaming service
+  const isStreamingUrl = (url: string): { isStreaming: boolean; platform: string } => {
+    if (!url) return { isStreaming: false, platform: '' };
+    for (const platform of SUPPORTED_STREAMING_PLATFORMS) {
+      if (platform.pattern.test(url)) {
+        return { isStreaming: true, platform: platform.name };
+      }
+    }
+    return { isStreaming: false, platform: '' };
+  };
+
+  // Check if URL is from an unsupported platform
+  const checkUnsupportedPlatform = (url: string): { isUnsupported: boolean; name: string; reason: string } => {
+    if (!url) return { isUnsupported: false, name: '', reason: '' };
+    for (const platform of UNSUPPORTED_PLATFORMS) {
+      if (platform.pattern.test(url)) {
+        return { isUnsupported: true, name: platform.name, reason: platform.reason };
+      }
+    }
+    return { isUnsupported: false, name: '', reason: '' };
+  };
+
+  // Check if URL is a direct audio file
+  const isDirectAudioFile = (url: string): boolean => {
+    const audioExtensions = /\.(mp3|wav|ogg|m4a|aac|flac|webm|opus)(\?.*)?$/i;
+    return audioExtensions.test(url);
+  };
+
+  const validateAudioLink = (url: string): { valid: boolean; error?: string } => {
     const cleaned = cleanUrl(url);
-    return ReactPlayer.canPlay(cleaned);
+    
+    // First check if it's an unsupported platform
+    const unsupported = checkUnsupportedPlatform(cleaned);
+    if (unsupported.isUnsupported) {
+      return { valid: false, error: unsupported.reason };
+    }
+    
+    // Check if it's a supported streaming platform
+    const streaming = isStreamingUrl(cleaned);
+    if (streaming.isStreaming) {
+      return { valid: true };
+    }
+    
+    // Check if it's a direct audio file
+    if (isDirectAudioFile(cleaned)) {
+      return { valid: true };
+    }
+    
+    // For other URLs, check with ReactPlayer (but be cautious)
+    if (ReactPlayer.canPlay(cleaned)) {
+      return { valid: true };
+    }
+    
+    return { valid: false, error: 'This link format is not supported. Try YouTube, Vimeo, or direct audio files (.mp3, .wav)' };
   };
 
   const handleLinkPaste = async (e: React.ClipboardEvent<HTMLInputElement>) => {
@@ -66,14 +184,14 @@ export function SoundPickerModal({
     setLinkError('');
     
     if (cleaned) {
-      const isValid = validateAudioLink(cleaned);
+      const validation = validateAudioLink(cleaned);
       
-      if (isValid) {
+      if (validation.valid) {
         setShowPlayIcon(true);
         setLinkError('');
       } else {
         setShowPlayIcon(false);
-        setLinkError('Unable to load audio from this link');
+        setLinkError(validation.error || 'Unable to load audio from this link');
       }
     }
   };
@@ -91,16 +209,32 @@ export function SoundPickerModal({
     // Check if it looks like a URL before validating
     try {
       new URL(newVal.trim());
-      const isValid = validateAudioLink(newVal);
-      if (isValid) {
+      const validation = validateAudioLink(newVal);
+      if (validation.valid) {
         setShowPlayIcon(true);
+        setLinkError('');
       } else {
         setShowPlayIcon(false);
+        // Show error immediately for unsupported platforms
+        if (validation.error) {
+          setLinkError(validation.error);
+        }
       }
     } catch {
       // Not a valid URL yet, don't show error while typing
       setShowPlayIcon(false);
     }
+  };
+
+  const getSongImageUrl = (songId: string, songName: string): string => {
+    let hash = 0;
+    const str = songId || songName || 'default';
+    for (let i = 0; i < str.length; i++) {
+      hash = ((hash << 5) - hash) + str.charCodeAt(i);
+      hash |= 0;
+    }
+    const index = Math.abs(hash) % FALLBACK_IMAGES.length;
+    return FALLBACK_IMAGES[index];
   };
 
   const handleAddCustomSong = () => {
@@ -111,17 +245,52 @@ export function SoundPickerModal({
 
     const finalUrl = cleanUrl(customLink);
     
-    if (!validateAudioLink(finalUrl)) {
-      setLinkError('This link is not supported. Try SoundCloud, YouTube, or direct audio links.');
+    const validation = validateAudioLink(finalUrl);
+    if (!validation.valid) {
+      setLinkError(validation.error || 'This link is not supported. Try YouTube, Vimeo, or direct audio links (.mp3, .wav)');
       setShowPlayIcon(false);
       return;
     }
     
+    const songId = `custom-${Date.now()}`;
+    const { isStreaming, platform } = isStreamingUrl(finalUrl);
+    const isAudioFile = isDirectAudioFile(finalUrl);
+    
+    // Get thumbnail for YouTube, or use fallback
+    let imageUrl: string;
+    const youtubeThumbnail = getYouTubeThumbnail(customLink); // Use original URL to get video ID
+    if (youtubeThumbnail) {
+      imageUrl = youtubeThumbnail;
+    } else {
+      imageUrl = getSongImageUrl(songId, 'Custom Audio');
+    }
+    
+    // Determine name based on source type
+    let songName = 'Custom Audio';
+    let songDuration = 'Custom • Live';
+    
+    if (platform) {
+      songName = `${platform} Audio`;
+      songDuration = `${platform} • Stream`;
+    } else if (isAudioFile) {
+      // Try to extract filename from URL
+      try {
+        const urlPath = new URL(finalUrl).pathname;
+        const filename = urlPath.split('/').pop()?.replace(/\.[^/.]+$/, '') || 'Audio File';
+        songName = decodeURIComponent(filename).substring(0, 30);
+        songDuration = 'Audio File';
+      } catch {
+        songName = 'Audio File';
+        songDuration = 'Direct Link';
+      }
+    }
+    
     const newSong: Song = {
-      id: `custom-${Date.now()}`,
-      name: 'Custom Audio',
-      duration: 'Custom • Live',
+      id: songId,
+      name: songName,
+      duration: songDuration,
       audioUrl: finalUrl,
+      imageUrl,
       isCustom: true,
     };
     
@@ -176,6 +345,7 @@ export function SoundPickerModal({
             <SongItem 
               song={song} 
               onSelect={() => onSelectSong(song.id)}
+              onDelete={song.isCustom && onDeleteSong ? () => onDeleteSong(song.id) : undefined}
               isSelected={selectedSongId === song.id}
             />
             {/* Separator */}
@@ -262,7 +432,7 @@ const FALLBACK_IMAGES = [
   "https://images.unsplash.com/photo-1682943827405-6261f5540d68?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxhYnN0cmFjdCUyMGF1ZGlvJTIwc3BlY3RydW18ZW58MXx8fHwxNzY5ODA2MTMxfDA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral"
 ];
 
-function SongItem({ song, onSelect, isSelected }: { song: Song; onSelect: () => void; isSelected: boolean }) {
+function SongItem({ song, onSelect, onDelete, isSelected }: { song: Song; onSelect: () => void; onDelete?: () => void; isSelected: boolean }) {
   const [imageError, setImageError] = useState(false);
   const [randomImageUrl, setRandomImageUrl] = useState('');
 
@@ -278,6 +448,13 @@ function SongItem({ song, onSelect, isSelected }: { song: Song; onSelect: () => 
       setRandomImageUrl(FALLBACK_IMAGES[index]);
     }
   }, [song.imageUrl, song.id, song.name, imageError]);
+
+  const handleDelete = (e: React.MouseEvent) => {
+    e.stopPropagation(); // Prevent selecting the song when deleting
+    if (onDelete) {
+      onDelete();
+    }
+  };
 
   return (
     <div className="content-stretch flex gap-[24px] items-center relative shrink-0 w-full group cursor-pointer" onClick={onSelect}>
@@ -308,7 +485,7 @@ function SongItem({ song, onSelect, isSelected }: { song: Song; onSelect: () => 
       </div>
 
       {/* Title */}
-      <div className="content-stretch flex flex-col gap-[8px] items-start leading-[normal] relative shrink-0 w-[454px] flex-1 whitespace-pre-wrap">
+      <div className="content-stretch flex flex-col gap-[8px] items-start leading-[normal] relative shrink-0 flex-1 whitespace-pre-wrap min-w-0">
         <p className="font-['SF_Pro:Regular',sans-serif] font-normal relative shrink-0 text-[#111] text-[20px] w-full truncate" style={{ fontVariationSettings: "'wdth' 100" }}>
           {song.name}
         </p>
@@ -316,6 +493,24 @@ function SongItem({ song, onSelect, isSelected }: { song: Song; onSelect: () => 
           {song.duration}
         </p>
       </div>
+
+      {/* Delete Button - only for custom songs */}
+      {onDelete && (
+        <button
+          onClick={handleDelete}
+          className="relative shrink-0 size-[40px] opacity-0 group-hover:opacity-100 transition-opacity hover:scale-110"
+          title="Remove"
+        >
+          <svg className="block size-full" fill="none" viewBox="0 0 24 24">
+            <path 
+              d="M6 6L18 18M6 18L18 6" 
+              stroke="#bdbdbd" 
+              strokeWidth="2" 
+              strokeLinecap="round"
+            />
+          </svg>
+        </button>
+      )}
 
       {/* Play Button */}
       <div className="relative shrink-0 size-[56px] group-hover:scale-105 transition-transform">

@@ -479,3 +479,41 @@ When working on this codebase:
 6. **Ask the north star question** — Does this help focus or ask for attention?
 
 This is a focus instrument, not software. Treat it accordingly.
+
+---
+
+## 18. Credit Optimization (AI Agent Guidelines)
+
+The user has limited Cursor credits. Optimize usage:
+
+### Model Selection
+- **Use fast/smaller models** for:
+  - Simple component edits
+  - Renaming/refactoring
+  - Adding comments or documentation
+  - Styling changes (Tailwind classes)
+  - Small bug fixes with obvious solutions
+  
+- **Use capable models only** for:
+  - Complex architectural decisions
+  - Debugging tricky issues
+  - Multi-file refactors
+  - Understanding unfamiliar code patterns
+
+### Batch Requests
+- Combine related file reads into single operations
+- Group related edits when possible
+- Use parallel tool calls for independent operations
+- Avoid repeated searches for the same information
+
+### Ask Before Acting
+Since the user cannot code themselves:
+- **Always explain** what you plan to do before making changes
+- **Present options** when multiple approaches exist
+- **Confirm destructive changes** (deletions, major refactors)
+- **Summarize changes** after completion
+
+### Minimize Token Usage
+- Reference files with @ instead of pasting content
+- Read only necessary sections of large files
+- Keep responses concise and actionable

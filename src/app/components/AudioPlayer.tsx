@@ -1,4 +1,4 @@
-import { useRef, useEffect, useState } from 'react';
+import { useRef, useEffect, useState, useImperativeHandle, forwardRef } from 'react';
 import ReactPlayer from 'react-player';
 
 interface AudioPlayerProps {
@@ -6,109 +6,175 @@ interface AudioPlayerProps {
   isPlaying: boolean;
   moodKey: number;
   volume?: number;
+  onProgress?: (currentTime: number) => void;
+  onDuration?: (duration: number) => void;
 }
 
-export function AudioPlayer({ src, isPlaying, moodKey, volume: externalVolume = 0.7 }: AudioPlayerProps) {
+export interface AudioPlayerRef {
+  seek: (progress: number) => void;
+  getAudioElement: () => HTMLAudioElement | null;
+  getAudioContext: () => AudioContext | null;
+  getSourceNode: () => AudioNode | null;
+}
+
+// Check if URL is a streaming URL that needs ReactPlayer
+// Note: react-player v3 only supports YouTube, Vimeo, Wistia, Mux, and direct files
+// Spotify, SoundCloud, Facebook, Twitch, DailyMotion, Mixcloud are NOT supported
+const isStreamingUrl = (url: string): boolean => {
+  if (!url) return false;
+  // Only include platforms actually supported by react-player v3
+  const streamingPatterns = [
+    /youtube\.com/i,
+    /youtu\.be/i,
+    /vimeo\.com/i,
+    /wistia\.com/i,
+    /mux\.com/i,
+  ];
+  return streamingPatterns.some(pattern => pattern.test(url));
+};
+
+export const AudioPlayer = forwardRef<AudioPlayerRef, AudioPlayerProps>(function AudioPlayer(
+  { src, isPlaying, moodKey, volume: externalVolume = 0.7, onProgress, onDuration },
+  ref
+) {
   // Web Audio API refs (for generated audio)
   const audioContextRef = useRef<AudioContext | null>(null);
   const oscillatorsRef = useRef<OscillatorNode[]>([]);
   const gainNodesRef = useRef<GainNode[]>([]);
   const masterGainRef = useRef<GainNode | null>(null);
   
-  // ReactPlayer state
-  const [volume, setVolume] = useState(0);
-  const fadeIntervalRef = useRef<NodeJS.Timeout | null>(null);
-  const [playerReady, setPlayerReady] = useState(false);
-  const [playerKey, setPlayerKey] = useState(0);
-
-  // Reset player ready state and force remount when src changes
+  // Native audio element ref
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const [audioReady, setAudioReady] = useState(false);
+  
+  // ReactPlayer ref for streaming URLs
+  const reactPlayerRef = useRef<ReactPlayer | null>(null);
+  
+  // State to handle unmuting after autoplay starts (browsers block autoplay with sound)
+  const [isMutedForAutoplay, setIsMutedForAutoplay] = useState(true);
+  // Track if video has started playing at least once
+  const [hasStartedPlaying, setHasStartedPlaying] = useState(false);
+  
+  // Compute directly instead of using state to avoid race conditions
+  const useReactPlayer = src ? isStreamingUrl(src) : false;
+  
+  // Reset states when source changes
   useEffect(() => {
-    setPlayerReady(false);
-    setVolume(0);
-    if (fadeIntervalRef.current) {
-      clearInterval(fadeIntervalRef.current);
-      fadeIntervalRef.current = null;
+    if (useReactPlayer) {
+      setIsMutedForAutoplay(true);
+      setHasStartedPlaying(false);
     }
-    setPlayerKey(prev => prev + 1); // Force ReactPlayer to remount
+  }, [src, useReactPlayer]);
+
+  // Expose methods to parent via ref
+  useImperativeHandle(ref, () => ({
+    seek: (progress: number) => {
+      if (useReactPlayer && reactPlayerRef.current) {
+        reactPlayerRef.current.seekTo(progress, 'fraction');
+      } else if (audioRef.current && audioRef.current.duration) {
+        audioRef.current.currentTime = progress * audioRef.current.duration;
+      }
+    },
+    getAudioElement: () => audioRef.current,
+    getAudioContext: () => {
+      return src === null ? audioContextRef.current : null;
+    },
+    getSourceNode: () => {
+      return src === null ? masterGainRef.current : null;
+    },
+  }), [src, useReactPlayer]);
+
+  // Create audio element when src changes (only for non-streaming URLs)
+  useEffect(() => {
+    // Skip if using ReactPlayer for streaming URLs
+    if (src && isStreamingUrl(src)) {
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current.src = '';
+        audioRef.current = null;
+      }
+      setAudioReady(false);
+      return;
+    }
+    
+    if (!src) {
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current.src = '';
+        audioRef.current = null;
+      }
+      setAudioReady(false);
+      return;
+    }
+
+    // Create new audio element for direct audio files
+    const audio = new Audio(src);
+    audio.loop = true;
+    audio.volume = externalVolume;
+    audio.preload = 'auto';
+    
+    audio.onloadedmetadata = () => {
+      setAudioReady(true);
+      if (onDuration) {
+        onDuration(audio.duration);
+      }
+    };
+    
+    audio.ontimeupdate = () => {
+      if (onProgress) {
+        onProgress(audio.currentTime);
+      }
+    };
+    
+    audio.onerror = (e) => {
+      console.error('Audio error:', e, 'src:', src);
+      setAudioReady(false);
+    };
+
+    audio.onplay = () => {
+      console.log('Audio started playing:', src);
+    };
+
+    audioRef.current = audio;
+
+    return () => {
+      audio.pause();
+      audio.src = '';
+    };
   }, [src]);
 
-  // Start fade in when player becomes ready and we're supposed to be playing
+  // Handle play/pause for native audio (skip if using ReactPlayer)
   useEffect(() => {
-    if (src && playerReady && isPlaying && volume === 0) {
-      fadeIn();
-    }
-  }, [playerReady, src]);
+    if (useReactPlayer || !audioRef.current || !src) return;
 
-  // Handle play/pause and fading for External Audio (ReactPlayer)
-  useEffect(() => {
-    if (src === null) return;
-    
-    // Only start fading in if player is ready
-    if (isPlaying && playerReady) {
-      fadeIn();
-    } else if (!isPlaying) {
-      fadeOut();
-    }
-  }, [isPlaying, src, playerReady]);
-
-  // Handle volume changes
-  useEffect(() => {
-    if (src === null) return;
-    // ReactPlayer volume is handled via prop
-  }, [volume, src]);
-
-  // Update internal volume when external volume changes (if playing)
-  useEffect(() => {
-    if (isPlaying && !fadeIntervalRef.current) {
-      setVolume(externalVolume);
-    }
-  }, [externalVolume, isPlaying]);
-
-  const fadeIn = () => {
-    if (fadeIntervalRef.current) {
-      clearInterval(fadeIntervalRef.current);
-    }
-
-    let vol = 0;
-    setVolume(vol);
-
-    fadeIntervalRef.current = setInterval(() => {
-      vol += 0.02;
-      if (vol >= externalVolume) {
-        vol = externalVolume;
-        if (fadeIntervalRef.current) {
-          clearInterval(fadeIntervalRef.current);
-        }
+    if (isPlaying) {
+      audioRef.current.volume = externalVolume;
+      const playPromise = audioRef.current.play();
+      if (playPromise !== undefined) {
+        playPromise.catch((e) => {
+          if (e.name !== 'AbortError') {
+            console.warn('Audio play failed:', e);
+          }
+        });
       }
-      setVolume(vol);
-    }, 50);
-  };
-
-  const fadeOut = (callback?: () => void) => {
-    if (fadeIntervalRef.current) {
-      clearInterval(fadeIntervalRef.current);
+    } else {
+      audioRef.current.pause();
     }
+  }, [isPlaying, src, audioReady, useReactPlayer]);
 
-    let vol = volume;
-
-    fadeIntervalRef.current = setInterval(() => {
-      vol -= 0.02;
-      if (vol <= 0) {
-        vol = 0;
-        if (fadeIntervalRef.current) {
-          clearInterval(fadeIntervalRef.current);
-        }
-        if (callback) callback();
-      }
-      setVolume(vol);
-    }, 50);
-  };
+  // Handle volume changes for native audio
+  useEffect(() => {
+    if (audioRef.current && !useReactPlayer) {
+      audioRef.current.volume = externalVolume;
+    }
+  }, [externalVolume, useReactPlayer]);
 
   // Cleanup on unmount
   useEffect(() => {
     return () => {
-      if (fadeIntervalRef.current) {
-        clearInterval(fadeIntervalRef.current);
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current.src = '';
       }
       
       oscillatorsRef.current.forEach(osc => {
@@ -206,7 +272,7 @@ export function AudioPlayer({ src, isPlaying, moodKey, volume: externalVolume = 
       }
     });
     
-    // Cleanup function: stop oscillators when this effect re-runs (e.g. mood change or src change)
+    // Cleanup function: stop oscillators when this effect re-runs
     return () => {
         oscillatorsRef.current.forEach(osc => {
             try { osc.stop(); } catch(e) {}
@@ -246,54 +312,96 @@ export function AudioPlayer({ src, isPlaying, moodKey, volume: externalVolume = 
     }
   }, [isPlaying, src]);
 
-  return (
-    <>
-      {src && (
-        <div style={{ position: 'fixed', bottom: 0, right: 0, opacity: 0, pointerEvents: 'none', width: '1px', height: '1px', zIndex: -1000, overflow: 'hidden' }}>
-          <ReactPlayer
-            key={playerKey}
-            url={src}
-            playing={isPlaying && playerReady}
-            volume={volume}
-            width="100%"
-            height="100%"
-            loop={true}
-            onReady={() => {
-              console.log("ReactPlayer ready, URL:", src);
-              setPlayerReady(true);
+  // ReactPlayer handlers
+  const handleReactPlayerProgress = (state: { playedSeconds: number }) => {
+    if (onProgress) {
+      onProgress(state.playedSeconds);
+    }
+  };
+
+  const handleReactPlayerDuration = (duration: number) => {
+    if (onDuration) {
+      onDuration(duration);
+    }
+  };
+
+  // Handle when playing starts
+  const handleReactPlayerPlay = () => {
+    console.log('ReactPlayer started playing:', src);
+    setHasStartedPlaying(true);
+    // Unmute after autoplay starts
+    setTimeout(() => {
+      setIsMutedForAutoplay(false);
+    }, 300);
+  };
+
+  // Render ReactPlayer for streaming URLs - visible player in corner for YouTube
+  if (useReactPlayer && src) {
+    console.log('Rendering ReactPlayer with:', { src, isPlaying, volume: externalVolume, muted: isMutedForAutoplay });
+    return (
+      <div 
+        style={{ 
+          position: 'fixed',
+          bottom: '20px',
+          right: '20px',
+          width: '240px',
+          height: '135px',
+          borderRadius: '12px',
+          overflow: 'hidden',
+          boxShadow: '0 4px 20px rgba(0,0,0,0.25)',
+          zIndex: 9999,
+          background: '#000',
+        }}
+      >
+        <ReactPlayer
+          ref={reactPlayerRef}
+          url={src}
+          playing={isPlaying}
+          loop={true}
+          volume={externalVolume}
+          muted={isMutedForAutoplay}
+          controls={true}
+          onProgress={handleReactPlayerProgress}
+          onDuration={handleReactPlayerDuration}
+          onError={(e, data) => console.error('ReactPlayer error:', e, data)}
+          onReady={() => {
+            console.log('ReactPlayer ready:', src);
+          }}
+          onPlay={handleReactPlayerPlay}
+          onPause={() => console.log('ReactPlayer paused:', src)}
+          onBuffer={() => console.log('ReactPlayer buffering:', src)}
+          onBufferEnd={() => console.log('ReactPlayer buffer ended:', src)}
+          onStart={() => console.log('ReactPlayer onStart:', src)}
+          width="100%"
+          height="100%"
+        />
+        {/* Overlay prompting user to click if video hasn't started */}
+        {!hasStartedPlaying && isPlaying && (
+          <div
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              background: 'rgba(0,0,0,0.7)',
+              color: 'white',
+              fontSize: '12px',
+              fontWeight: 500,
+              textAlign: 'center',
+              padding: '8px',
+              pointerEvents: 'none',
             }}
-            onError={(e) => {
-              console.error("ReactPlayer Error:", e, "URL:", src);
-              setPlayerReady(false);
-            }}
-            onPlay={() => console.log("ReactPlayer playing")}
-            onPause={() => console.log("ReactPlayer paused")}
-            config={{
-              file: {
-                forceAudio: true,
-                attributes: {
-                  crossOrigin: 'anonymous'
-                }
-              },
-              soundcloud: {
-                options: { 
-                    auto_play: true,
-                    buying: false,
-                    sharing: false,
-                    download: false,
-                    show_artwork: false,
-                    show_playcount: false,
-                    show_user: false,
-                    visual: false 
-                }
-              },
-              youtube: {
-                playerVars: { showinfo: 0, controls: 0 }
-              }
-            }}
-          />
-        </div>
-      )}
-    </>
-  );
-}
+          >
+            Click video to start audio
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  return null;
+})

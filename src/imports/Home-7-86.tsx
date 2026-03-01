@@ -1,10 +1,11 @@
 // Home component with 3-mode theme system (light/dark/color)
+import { useState } from 'react';
 import svgPaths from "./svg-e0ybop1bd5";
-import svgPathsNew from "./svg-s3q89le1fv";
 import { LiveClock } from "@/app/components/LiveClock";
 import { DynamicGreeting } from "@/app/components/DynamicGreeting";
-import { VolumeControl } from "@/app/components/VolumeControl";
 import { TodoList } from "@/app/components/TodoList";
+import { AudioPlayerUI } from "@/app/components/AudioPlayerUI";
+import { AudioPlayerRef } from "@/app/components/AudioPlayer";
 
 function Greeting({ themeMode }: { themeMode?: 'light' | 'dark' | 'color' }) {
   return (
@@ -16,103 +17,100 @@ function Greeting({ themeMode }: { themeMode?: 'light' | 'dark' | 'color' }) {
   );
 }
 
-function Focus1({ isOn }: { isOn?: boolean }) {
-  // Knob animation: Left (0) to Right (41px)
-  // 89 (width) - 40 (knob) - 4 (left margin) - 4 (right margin) = 41px travel
-  const knobStyle = {
-    transform: isOn ? 'translateX(41px)' : 'translateX(0)',
-    transition: 'transform 0.3s cubic-bezier(0.4, 0.0, 0.2, 1)'
-  };
-
+function FocusToggle({ isOn, themeMode, timeRemaining }: { isOn?: boolean; themeMode?: 'light' | 'dark' | 'color'; timeRemaining?: number | null }) {
+  // New design: Toggle with "Focus" label on the right
+  // Container with inset shadow, white knob slides, and "Focus" label
+  // When timer is active, show minutes remaining countdown next to toggle
+  
+  const minutesRemaining = timeRemaining && timeRemaining > 0 
+    ? Math.ceil(timeRemaining / 60000) 
+    : null;
+  
   return (
-    <div className="h-[48px] relative shrink-0 w-[89px]" data-name="Focus">
-      <svg className="block size-full" fill="none" preserveAspectRatio="none" viewBox="0 0 89 48">
-        <g filter="url(#filter0_ii_29_58)" id="Focus">
-          <g clipPath="url(#clip0_29_58)">
-            <path d={svgPathsNew.p9367000} fill="var(--fill-0, #DCDCDC)" />
-            <g 
-              filter="url(#filter1_d_29_58)" 
-              id="Toggle" 
-              style={knobStyle}
-            >
-              <rect fill="var(--fill-0, white)" height="40" rx="20" width="40" x="4" y="4" />
-              <rect height="38" rx="19" stroke="url(#paint0_linear_29_58)" strokeWidth="2" width="38" x="5" y="5" />
-            </g>
-            <circle cx="66.5" cy="24" id="Ellipse 36" r="5" stroke="var(--stroke-0, white)" strokeWidth="2" />
-          </g>
-        </g>
-        <defs>
-          <filter colorInterpolationFilters="sRGB" filterUnits="userSpaceOnUse" height="50" id="filter0_ii_29_58" width="91" x="0" y="0">
-            <feFlood floodOpacity="0" result="BackgroundImageFix" />
-            <feBlend in="SourceGraphic" in2="BackgroundImageFix" mode="normal" result="shape" />
-            <feColorMatrix in="SourceAlpha" result="hardAlpha" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0" />
-            <feMorphology in="SourceAlpha" operator="dilate" radius="7" result="effect1_innerShadow_29_58" />
-            <feOffset dy="8" />
-            <feGaussianBlur stdDeviation="4.5" />
-            <feComposite in2="hardAlpha" k2="-1" k3="1" operator="arithmetic" />
-            <feColorMatrix type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.08 0" />
-            <feBlend in2="shape" mode="normal" result="effect1_innerShadow_29_58" />
-            <feColorMatrix in="SourceAlpha" result="hardAlpha" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0" />
-            <feMorphology in="SourceAlpha" operator="dilate" radius="3" result="effect2_innerShadow_29_58" />
-            <feOffset dx="2" />
-            <feGaussianBlur stdDeviation="6" />
-            <feComposite in2="hardAlpha" k2="-1" k3="1" operator="arithmetic" />
-            <feColorMatrix type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.12 0" />
-            <feBlend in2="effect1_innerShadow_29_58" mode="normal" result="effect2_innerShadow_29_58" />
-          </filter>
-          <filter colorInterpolationFilters="sRGB" filterUnits="userSpaceOnUse" height="50" id="filter1_d_29_58" width="50" x="-1" y="3">
-            <feFlood floodOpacity="0" result="BackgroundImageFix" />
-            <feColorMatrix in="SourceAlpha" result="hardAlpha" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0" />
-            <feMorphology in="SourceAlpha" operator="erode" radius="3" result="effect1_dropShadow_29_58" />
-            <feOffset dy="4" />
-            <feGaussianBlur stdDeviation="4" />
-            <feComposite in2="hardAlpha" operator="out" />
-            <feColorMatrix type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.54 0" />
-            <feBlend in2="BackgroundImageFix" mode="normal" result="effect1_dropShadow_29_58" />
-            <feBlend in="SourceGraphic" in2="effect1_dropShadow_29_58" mode="normal" result="shape" />
-          </filter>
-          <linearGradient gradientUnits="userSpaceOnUse" id="paint0_linear_29_58" x1="24" x2="24" y1="4" y2="44">
-            <stop stopColor="white" />
-            <stop offset="1" stopColor="#C4C4C4" />
-          </linearGradient>
-          <clipPath id="clip0_29_58">
-            <path d={svgPathsNew.p9367000} fill="white" />
-          </clipPath>
-        </defs>
-      </svg>
+    <div 
+      className={`content-stretch flex items-center overflow-clip p-[4px] relative rounded-[112px] shrink-0 transition-colors duration-500 ${
+        themeMode === 'dark' ? 'bg-[#272727]' : 'bg-[#dcdcdc]'
+      }`}
+      data-name="Toggle"
+    >
+      {/* Sliding knob - absolutely positioned, slides from left to right when active */}
+      <div 
+        className={`absolute rounded-[88px] shrink-0 size-[40px] transition-all duration-300 ease-[cubic-bezier(0.4,0.0,0.2,1)] ${
+          themeMode === 'light' 
+            ? 'bg-white shadow-[0px_4px_8px_-3px_rgba(0,0,0,0.54)]' 
+            : 'bg-[#4f4f4f] shadow-[0px_4px_8px_-3px_rgba(0,0,0,0.54)]'
+        }`}
+        style={{
+          left: isOn ? 'calc(100% - 44px)' : '4px',
+          top: '4px',
+        }}
+        data-name="Knob"
+      />
+      
+      {/* Focus label - positioned to the right */}
+      <div className="content-stretch flex items-center px-[8px] relative shrink-0 ml-auto" data-name="Label">
+        <p 
+          className={`font-['SF_Pro:Regular',sans-serif] font-normal leading-[normal] relative shrink-0 text-[12px] text-center transition-colors duration-500 ${
+            themeMode === 'light' ? 'text-[#6d6d6d]' : 'text-[#888]'
+          }`}
+          style={{ fontVariationSettings: "'wdth' 100" }}
+        >
+          Focus
+        </p>
+      </div>
+      
+      {/* Minutes remaining countdown - shown when timer is active */}
+      {isOn && minutesRemaining !== null && (
+        <div className="content-stretch flex items-center px-[12px] relative shrink-0 ml-[8px]" data-name="Countdown">
+          <p 
+            className={`font-body-cue font-normal leading-[normal] relative shrink-0 text-[16px] text-center transition-colors duration-500 ${
+              themeMode === 'light' ? 'text-[#6d6d6d]' : 'text-[#888]'
+            }`}
+          >
+            {minutesRemaining}m
+          </p>
+        </div>
+      )}
+      
+      {/* Inset shadow overlay */}
+      <div className="absolute inset-0 pointer-events-none rounded-[inherit] shadow-[inset_2px_0px_12px_-3px_rgba(0,0,0,0.12),inset_0px_8px_9px_-7px_rgba(0,0,0,0.08)]" />
     </div>
   );
 }
 
-function TimerSwitch({ isTimerActive }: { isTimerActive?: boolean }) {
+function TimerSwitch({ isTimerActive, themeMode, timeRemaining }: { isTimerActive?: boolean; themeMode?: 'light' | 'dark' | 'color'; timeRemaining?: number | null }) {
   // data-name="Timer" allows HomeWrapper to capture clicks and trigger the timer
   return (
     <div className="content-stretch flex h-[208px] items-start justify-center p-[24px] relative shrink-0 w-[342px] cursor-pointer" data-name="Timer">
-      <Focus1 isOn={isTimerActive} />
+      <FocusToggle isOn={isTimerActive} themeMode={themeMode} timeRemaining={timeRemaining} />
     </div>
   );
 }
 
 function Push({ themeMode }: { themeMode?: 'light' | 'dark' | 'color' }) {
-  // Animate button position: light (left) -> dark/color (left, stays)
-  const buttonStyle = {
-    transform: 'translateX(0)', // Always stays left
-    transition: 'transform 0.3s cubic-bezier(0.4, 0.0, 0.2, 1)'
-  };
-
+  // Neomorphic push button with centered inner knob
   return (
     <div 
-      className={`-translate-y-1/2 absolute left-[4px] rounded-[88px] size-[40px] top-1/2 transition-all duration-500 ${
-        themeMode === 'light' ? 'bg-white shadow-[0px_4px_8px_-3px_rgba(0,0,0,0.54)]' : 
-        themeMode === 'color' ? 'bg-[#a079ed] border-2 border-white shadow-[0px_4px_8px_-3px_rgba(0,0,0,0.54)]' : 
-        'bg-[#4f4f4f] border-2 border-[#8c8c8c] shadow-[0px_4px_8px_-3px_rgba(0,0,0,0.54)]'
-      }`} 
+      className={`overflow-clip relative rounded-[112px] shrink-0 size-[48px] transition-all duration-500 ${
+        themeMode === 'dark' ? 'bg-[#272727]' : 'bg-[#dcdcdc]'
+      }`}
       data-name="Push"
-      style={buttonStyle}
     >
-      <div className="flex flex-row items-center justify-center size-full">
-        <div className="size-full" />
+      {/* Inner white button with elevated shadow */}
+      <div 
+        className={`-translate-x-1/2 -translate-y-1/2 absolute content-stretch flex items-center justify-center left-1/2 overflow-clip rounded-[88px] size-[44px] top-1/2 border border-solid transition-all duration-500 ${
+          themeMode === 'light' 
+            ? 'bg-white border-white shadow-[0px_4px_8px_-3px_rgba(0,0,0,0.54),3px_28px_27px_5px_rgba(0,0,0,0.22)]' 
+            : themeMode === 'color'
+            ? 'bg-[#a079ed] border-[#c4a8ff] shadow-[0px_4px_8px_-3px_rgba(0,0,0,0.54),3px_28px_27px_5px_rgba(0,0,0,0.22)]'
+            : 'bg-[#4f4f4f] border-[#6a6a6a] shadow-[0px_4px_8px_-3px_rgba(0,0,0,0.54),3px_28px_27px_5px_rgba(0,0,0,0.22)]'
+        }`}
+        data-name="Inner"
+      >
+        {/* Empty center - no icon for theme toggle */}
       </div>
+      {/* Inset shadow overlay */}
+      <div className="absolute inset-0 pointer-events-none rounded-[inherit] shadow-[inset_2px_0px_12px_-3px_rgba(0,0,0,0.12),inset_0px_8px_9px_-7px_rgba(0,0,0,0.08)]" />
     </div>
   );
 }
@@ -121,13 +119,10 @@ function ChangeTheme({ themeMode, onToggle }: { themeMode?: 'light' | 'dark' | '
   return (
     <div 
       onClick={onToggle}
-      className={`overflow-clip relative rounded-[112px] shrink-0 size-[48px] cursor-pointer hover:opacity-80 transition-all duration-500 ${
-        themeMode === 'dark' ? 'bg-[#272727]' : 'bg-[#dcdcdc]'
-      }`} 
+      className="cursor-pointer hover:opacity-80 transition-opacity"
       data-name="Change Theme"
     >
       <Push themeMode={themeMode} />
-      <div className="absolute inset-0 pointer-events-none rounded-[inherit] shadow-[inset_2px_0px_12px_-3px_rgba(0,0,0,0.12),inset_0px_8px_9px_-7px_rgba(0,0,0,0.08)]" />
     </div>
   );
 }
@@ -140,14 +135,33 @@ function ThemeToggle({ themeMode, onToggle }: { themeMode?: 'light' | 'dark' | '
   );
 }
 
-function Top({ isTimerActive, themeMode, onToggleDarkMode }: { isTimerActive?: boolean; themeMode?: 'light' | 'dark' | 'color'; onToggleDarkMode?: () => void }) {
+function Top({ isTimerActive, themeMode, timeRemaining, onToggleDarkMode }: { isTimerActive?: boolean; themeMode?: 'light' | 'dark' | 'color'; timeRemaining?: number | null; onToggleDarkMode?: () => void }) {
   return (
     <div className="absolute content-stretch flex items-start justify-between left-0 top-0 w-full" data-name="Top">
-      <div style={{ opacity: isTimerActive ? 0 : 1, transition: 'opacity 0.8s ease-in-out' }}>
+      {/* Greeting - Left - fades away when focus mode is on */}
+      <div 
+        style={{ 
+          opacity: isTimerActive ? 0 : 1, 
+          transition: 'opacity 0.8s ease-in-out',
+          pointerEvents: isTimerActive ? 'none' : 'auto'
+        }}
+      >
         <Greeting themeMode={themeMode} />
       </div>
-      <TimerSwitch isTimerActive={isTimerActive} />
-      <ThemeToggle themeMode={themeMode} onToggle={onToggleDarkMode} />
+      
+      {/* Timer Switch - Center */}
+      <TimerSwitch isTimerActive={isTimerActive} themeMode={themeMode} timeRemaining={timeRemaining} />
+      
+      {/* Theme Toggle - Right - fades away when focus mode is on */}
+      <div 
+        style={{ 
+          opacity: isTimerActive ? 0 : 1, 
+          transition: 'opacity 0.8s ease-in-out',
+          pointerEvents: isTimerActive ? 'none' : 'auto'
+        }}
+      >
+        <ThemeToggle themeMode={themeMode} onToggle={onToggleDarkMode} />
+      </div>
     </div>
   );
 }
@@ -156,7 +170,19 @@ function Ticker2({ themeMode }: { themeMode?: 'light' | 'dark' | 'color' }) {
   return <div className={`-translate-x-1/2 -translate-y-1/2 absolute left-1/2 rounded-[88px] shadow-[0px_4px_8px_0px_rgba(0,0,0,0.54),3px_12px_27px_0px_rgba(0,0,0,0.22)] w-[30px] h-[30px] sm:size-[42.793px] top-1/2 transition-colors duration-500 ${themeMode === 'light' ? 'bg-gradient-to-b from-[#666] to-black' : 'bg-gradient-to-b from-[#888] to-[#555]'}`} data-name="Ticker" />;
 }
 
-function Ticker1({ isTimerActive, timeRemaining, onClockClick, themeMode }: { isTimerActive?: boolean; timeRemaining?: number | null; onClockClick?: () => void; themeMode?: 'light' | 'dark' | 'color' }) {
+function Ticker1({ 
+  isTimerActive, 
+  timeRemaining, 
+  onClockClick, 
+  draggedMinutes,
+  themeMode 
+}: { 
+  isTimerActive?: boolean; 
+  timeRemaining?: number | null; 
+  onClockClick?: () => void;
+  draggedMinutes?: number | null;
+  themeMode?: 'light' | 'dark' | 'color' 
+}) {
   return (
     <div 
       onClick={(e) => {
@@ -168,16 +194,97 @@ function Ticker1({ isTimerActive, timeRemaining, onClockClick, themeMode }: { is
       className={`-translate-x-1/2 -translate-y-1/2 absolute left-[calc(50%+3px)] sm:left-[calc(50%+4.37px)] rounded-[88px] shadow-[0px_4px_4px_0px_rgba(0,0,0,0.25)] w-[30px] h-[30px] sm:size-[42.793px] top-[calc(50%+3.5px)] sm:top-[calc(50%+5.03px)] transition-colors duration-500 ${isTimerActive ? 'cursor-pointer hover:scale-110 transition-transform' : ''} ${themeMode === 'light' ? 'bg-gradient-to-b from-[#666] to-black' : 'bg-gradient-to-b from-[#888] to-[#555]'}`} 
       data-name="Ticker"
     >
-      <LiveClock isTimerActive={isTimerActive} timeRemaining={timeRemaining} />
+      <LiveClock 
+        isTimerActive={isTimerActive} 
+        timeRemaining={timeRemaining}
+        draggedMinutes={draggedMinutes}
+      />
       <Ticker2 themeMode={themeMode} />
     </div>
   );
 }
 
-function Ticker({ isTimerActive, timeRemaining, onClockClick, themeMode }: { isTimerActive?: boolean; timeRemaining?: number | null; onClockClick?: () => void; themeMode?: 'light' | 'dark' | 'color' }) {
+function TimeButton({ minutes, onClick, themeMode, position }: { minutes: number; onClick: () => void; themeMode?: 'light' | 'dark' | 'color'; position: '15' | '30' | '45' }) {
+  // Position buttons around the clock at 15, 30, and 45 minute marks
+  // On a clock face: 15min = 3 o'clock (right), 30min = 6 o'clock (bottom), 45min = 9 o'clock (left)
+  // CSS: 0deg = right, 90deg = down, 180deg = left, 270deg = up
+  // Clock: 0deg = up (12 o'clock), 90deg = right (3 o'clock), 180deg = down (6 o'clock), 270deg = left (9 o'clock)
+  const angleMap = {
+    '15': 90,   // 3 o'clock (right)
+    '30': 180,  // 6 o'clock (bottom)
+    '45': 270   // 9 o'clock (left)
+  };
+  
+  const angle = angleMap[position];
+  const radius = 180; // Distance from center (adjust based on clock size)
+  
+  // Convert angle to x, y position relative to center
+  // CSS uses: 0deg = right, 90deg = down
+  // Clock uses: 0deg = up (12 o'clock), 90deg = right (3 o'clock)
+  // So we need: CSS angle = clock angle - 90
+  const cssAngle = angle - 90;
+  const rad = cssAngle * (Math.PI / 180);
+  const x = Math.cos(rad) * radius;
+  const y = Math.sin(rad) * radius;
+  
+  return (
+    <button
+      onClick={onClick}
+      className={`absolute -translate-x-1/2 -translate-y-1/2 rounded-[112px] shrink-0 size-[48px] transition-all duration-300 hover:scale-110 flex items-center justify-center ${
+        themeMode === 'light' 
+          ? 'bg-white shadow-[0px_4px_8px_-3px_rgba(0,0,0,0.54)]' 
+          : 'bg-[#4f4f4f] shadow-[0px_4px_8px_-3px_rgba(0,0,0,0.54)]'
+      }`}
+      style={{
+        left: `calc(50% + ${x}px)`,
+        top: `calc(50% + ${y}px)`,
+      }}
+      data-name={`TimeButton-${minutes}`}
+    >
+      <div className={`font-['SF_Pro:Regular',sans-serif] font-normal text-[12px] text-center transition-colors duration-500 ${
+        themeMode === 'light' ? 'text-[#6d6d6d]' : 'text-[#888]'
+      }`}>
+        {minutes}
+      </div>
+      <div className="absolute inset-0 pointer-events-none rounded-[inherit] shadow-[inset_2px_0px_12px_-3px_rgba(0,0,0,0.12),inset_0px_8px_9px_-7px_rgba(0,0,0,0.08)]" />
+    </button>
+  );
+}
+
+function Ticker({ 
+  isTimerActive, 
+  timeRemaining, 
+  onClockClick, 
+  draggedMinutes,
+  onTimeButtonClick,
+  showTimerSelector,
+  themeMode 
+}: { 
+  isTimerActive?: boolean; 
+  timeRemaining?: number | null; 
+  onClockClick?: () => void;
+  draggedMinutes?: number | null;
+  onTimeButtonClick?: (minutes: number) => void;
+  showTimerSelector?: boolean;
+  themeMode?: 'light' | 'dark' | 'color' 
+}) {
   return (
     <div className="absolute h-[250px] sm:h-[350px] lg:h-[411px] left-1/2 -translate-x-1/2 top-1/2 -translate-y-1/2 w-[300px] sm:w-[400px] lg:w-[434px]" data-name="Ticker">
-      <Ticker1 isTimerActive={isTimerActive} timeRemaining={timeRemaining} onClockClick={onClockClick} themeMode={themeMode} />
+      <Ticker1 
+        isTimerActive={isTimerActive} 
+        timeRemaining={timeRemaining} 
+        onClockClick={onClockClick}
+        draggedMinutes={draggedMinutes}
+        themeMode={themeMode} 
+      />
+      {/* Time selection buttons - only show when selector is visible and timer is not active */}
+      {showTimerSelector && !isTimerActive && (
+        <>
+          <TimeButton minutes={15} onClick={() => onTimeButtonClick?.(15)} themeMode={themeMode} position="15" />
+          <TimeButton minutes={30} onClick={() => onTimeButtonClick?.(30)} themeMode={themeMode} position="30" />
+          <TimeButton minutes={45} onClick={() => onTimeButtonClick?.(45)} themeMode={themeMode} position="45" />
+        </>
+      )}
     </div>
   );
 }
@@ -203,81 +310,69 @@ function Time({ themeMode }: { themeMode?: 'light' | 'dark' | 'color' }) {
   );
 }
 
-function Frame({ themeMode }: { themeMode?: 'light' | 'dark' | 'color' }) {
+function Frame({ 
+  themeMode, 
+  onMinuteHandDrag, 
+  onMinuteHandDragEnd, 
+  isTimerActive 
+}: { 
+  themeMode?: 'light' | 'dark' | 'color';
+  onMinuteHandDrag?: (minutes: number) => void;
+  onMinuteHandDragEnd?: (minutes: number) => void;
+  isTimerActive?: boolean;
+}) {
+  const [isDragging, setIsDragging] = useState(false);
+
+  const calculateMinutes = (e: React.PointerEvent) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const centerX = rect.left + rect.width / 2;
+    const centerY = rect.top + rect.height / 2;
+    const dx = e.clientX - centerX;
+    const dy = e.clientY - centerY;
+    // Calculate angle: atan2 gives angle from positive x-axis
+    // We want 0deg = up (12 o'clock), so we add 90 and normalize
+    const angle = (Math.atan2(dy, dx) * 180 / Math.PI + 90 + 360) % 360;
+    // Convert to minutes (0-60)
+    const minutes = Math.round((angle / 360) * 60);
+    return minutes;
+  };
+
+  const handlePointerDown = (e: React.PointerEvent) => {
+    if (isTimerActive) return;
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(true);
+    (e.target as HTMLElement).setPointerCapture(e.pointerId);
+    const minutes = calculateMinutes(e);
+    onMinuteHandDrag?.(minutes);
+  };
+
+  const handlePointerMove = (e: React.PointerEvent) => {
+    if (!isDragging || isTimerActive) return;
+    e.preventDefault();
+    const minutes = calculateMinutes(e);
+    onMinuteHandDrag?.(minutes);
+  };
+
+  const handlePointerUp = (e: React.PointerEvent) => {
+    if (!isDragging) return;
+    e.preventDefault();
+    setIsDragging(false);
+    (e.target as HTMLElement).releasePointerCapture(e.pointerId);
+    const minutes = calculateMinutes(e);
+    onMinuteHandDragEnd?.(minutes);
+  };
+
   return (
-    <div className="absolute content-stretch flex items-center justify-center left-1/2 -translate-x-1/2 p-2 sm:p-[10px] top-1/2 -translate-y-1/2 w-auto">
+    <div 
+      className="absolute content-stretch flex items-center justify-center left-1/2 -translate-x-1/2 p-2 sm:p-[10px] top-1/2 -translate-y-1/2 w-auto"
+      onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
+      onPointerUp={handlePointerUp}
+      onPointerLeave={handlePointerUp}
+      style={{ touchAction: 'none', cursor: isTimerActive ? 'default' : 'grab' }}
+    >
       <Time themeMode={themeMode} />
-    </div>
-  );
-}
-
-function Volume({ isPlaying, volume, onPlayPauseClick, onVolumeChange, onLongPress, themeMode }: {
-  isPlaying?: boolean;
-  volume?: number;
-  onPlayPauseClick?: () => void;
-  onVolumeChange?: (volume: number) => void;
-  onLongPress?: () => void;
-  themeMode?: 'light' | 'dark' | 'color';
-}) {
-  if (isPlaying !== undefined && volume !== undefined && onPlayPauseClick && onVolumeChange) {
-    return (
-      <VolumeControl
-        isPlaying={isPlaying}
-        volume={volume}
-        onPlayPauseClick={onPlayPauseClick}
-        onVolumeChange={onVolumeChange}
-        onLongPress={onLongPress}
-        themeMode={themeMode}
-      />
-    );
-  }
-
-  return (
-    <div className="absolute left-4 sm:left-[24px] w-[110px] h-[110px] sm:size-[130px] lg:size-[158px] top-2 sm:top-[13px]" data-name="Volume">
-      <div className="absolute inset-[-0.55%_-0.54%_0_-0.63%]">
-        <svg className="block size-full" fill="none" preserveAspectRatio="none" viewBox="0 0 159.858 158.87">
-          <g id="Volume">
-            <path 
-              d={svgPaths.p67dad80} 
-              id="Ellipse 57" 
-              stroke={themeMode === 'light' ? "black" : "rgba(255, 255, 255, 0.3)"} 
-              strokeDasharray="1 16" 
-              strokeWidth="2"
-              className="transition-all duration-500"
-            />
-            <path 
-              d={svgPaths.p191d0100} 
-              id="Ellipse 58" 
-              stroke={themeMode === 'light' ? "#B5B5B5" : "rgba(255, 255, 255, 0.2)"} 
-              strokeDasharray="1 16" 
-              strokeWidth="2"
-              className="transition-all duration-500"
-            />
-          </g>
-        </svg>
-      </div>
-    </div>
-  );
-}
-
-function Music({ isPlaying, volume, onVolumePlayPause, onVolumeChange, onVolumeLongPress, themeMode }: {
-  isPlaying?: boolean;
-  volume?: number;
-  onVolumePlayPause?: () => void;
-  onVolumeChange?: (volume: number) => void;
-  onVolumeLongPress?: () => void;
-  themeMode?: 'light' | 'dark' | 'color';
-}) {
-  return (
-    <div className="content-stretch flex gap-[10px] h-[275px] items-center justify-center px-[40px] py-[17px] relative shrink-0 w-[285px]" data-name="Music">
-      <Volume 
-        isPlaying={isPlaying}
-        volume={volume}
-        onPlayPauseClick={onVolumePlayPause}
-        onVolumeChange={onVolumeChange}
-        onLongPress={onVolumeLongPress}
-        themeMode={themeMode}
-      />
     </div>
   );
 }
@@ -293,7 +388,7 @@ function Table({ themeMode }: { themeMode?: 'light' | 'dark' | 'color' }) {
 function Tasks({ className, themeMode }: { className?: string; themeMode?: 'light' | 'dark' | 'color' }) {
   return (
     <div 
-      className={className || "h-[200px] sm:h-[230px] lg:h-[255px] relative rounded-[16px] sm:rounded-[24px] shrink-0 w-full transition-all duration-500"} 
+      className={className || "bg-[#e9e9e9] border border-[#e0e0e0] border-solid content-stretch flex items-end p-[16px] relative rounded-[24px] w-[265px] transition-all duration-500"} 
       data-name="Tasks" 
       style={{ 
         backgroundImage: themeMode === 'light'
@@ -303,24 +398,88 @@ function Tasks({ className, themeMode }: { className?: string; themeMode?: 'ligh
     >
       <div 
         aria-hidden="true" 
-        className={`absolute border border-solid inset-0 pointer-events-none rounded-[16px] sm:rounded-[24px] shadow-[0px_4px_4px_0px_rgba(0,0,0,0.04),0px_4px_8px_0px_rgba(0,0,0,0.16)] transition-colors duration-500 ${themeMode === 'light' ? 'border-[#e9e9e9]' : 'border-[#333]'}`}
+        className={`absolute border border-solid inset-0 pointer-events-none rounded-[24px] shadow-[0px_4px_4px_0px_rgba(0,0,0,0.04),0px_4px_8px_0px_rgba(0,0,0,0.16)] transition-colors duration-500 ${themeMode === 'light' ? 'border-[#e0e0e0]' : 'border-[#333]'}`}
       />
-      <div className="content-stretch flex items-start p-3 sm:p-4 lg:p-[16px] relative size-full">
+      <div className="content-stretch flex flex-col gap-[16px] items-start justify-center relative shrink-0 w-full" data-name="Table">
+        <p 
+          className={`font-['SF_Pro:Regular',sans-serif] font-normal leading-[normal] relative shrink-0 text-[12px] text-center transition-colors duration-500 ${
+            themeMode === 'light' ? 'text-[#6d6d6d]' : 'text-[#888]'
+          }`}
+          style={{ fontVariationSettings: "'wdth' 100" }}
+        >
+          Today
+        </p>
         <Table themeMode={themeMode} />
       </div>
     </div>
   );
 }
 
-function Frame2({ themeMode }: { themeMode?: 'light' | 'dark' | 'color' }) {
+function TasksContainer({ themeMode }: { themeMode?: 'light' | 'dark' | 'color' }) {
   return (
-    <div className="content-stretch flex flex-col items-start p-[10px] relative shrink-0 w-[285px]">
+    <div className="content-stretch flex flex-col items-start p-[10px] relative shrink-0 w-[285px]" data-name="TasksContainer">
       <Tasks themeMode={themeMode} />
     </div>
   );
 }
 
-function Frame3({ isPlaying, volume, onVolumePlayPause, onVolumeChange, onVolumeLongPress, isTimerActive, themeMode }: {
+function PlayerContainer({ 
+  songName, 
+  currentTime, 
+  duration, 
+  isPlaying, 
+  onSeek, 
+  onPlayPause, 
+  albumArtUrl,
+  themeMode,
+  onLongPress,
+  audioPlayerRef
+}: {
+  songName: string;
+  currentTime: number;
+  duration: number;
+  isPlaying: boolean;
+  onSeek: (progress: number) => void;
+  onPlayPause: () => void;
+  albumArtUrl?: string;
+  themeMode?: 'light' | 'dark' | 'color';
+  onLongPress?: () => void;
+  audioPlayerRef?: React.RefObject<AudioPlayerRef>;
+}) {
+  return (
+    <div className="content-stretch flex gap-[10px] h-[121px] items-center justify-center p-[24px] relative shrink-0" data-name="Player">
+      <AudioPlayerUI
+        songName={songName}
+        currentTime={currentTime}
+        duration={duration}
+        isPlaying={isPlaying}
+        onSeek={onSeek}
+        onPlayPause={onPlayPause}
+        albumArtUrl={albumArtUrl}
+        themeMode={themeMode}
+        onLongPress={onLongPress}
+        audioPlayerRef={audioPlayerRef}
+      />
+    </div>
+  );
+}
+
+
+function BottomBar({ 
+  isPlaying, 
+  volume, 
+  onVolumePlayPause, 
+  onVolumeChange, 
+  onVolumeLongPress, 
+  isTimerActive, 
+  themeMode,
+  songName,
+  currentTime,
+  duration,
+  onSeek,
+  albumArtUrl,
+  audioPlayerRef
+}: {
   isPlaying?: boolean;
   volume?: number;
   onVolumePlayPause?: () => void;
@@ -328,21 +487,40 @@ function Frame3({ isPlaying, volume, onVolumePlayPause, onVolumeChange, onVolume
   onVolumeLongPress?: () => void;
   isTimerActive?: boolean;
   themeMode?: 'light' | 'dark' | 'color';
+  songName?: string;
+  currentTime?: number;
+  duration?: number;
+  onSeek?: (progress: number) => void;
+  albumArtUrl?: string;
+  audioPlayerRef?: React.RefObject<AudioPlayerRef>;
 }) {
   return (
-    <div className="absolute bottom-0 content-stretch flex items-end justify-between left-0 w-full">
-      <div style={{ opacity: isTimerActive ? 0 : 1, transition: 'opacity 0.8s ease-in-out', pointerEvents: isTimerActive ? 'none' : 'auto' }}>
-        <Music 
-          isPlaying={isPlaying}
-          volume={volume}
-          onVolumePlayPause={onVolumePlayPause}
-          onVolumeChange={onVolumeChange}
-          onVolumeLongPress={onVolumeLongPress}
-          themeMode={themeMode}
-        />
+    <div className="absolute bottom-0 content-stretch flex items-end justify-start left-0 w-full" data-name="Bottom Bar">
+      {/* Tasks - Left - fades away when focus mode is on */}
+      <div 
+        style={{ 
+          opacity: isTimerActive ? 0 : 1, 
+          transition: 'opacity 0.8s ease-in-out',
+          pointerEvents: isTimerActive ? 'none' : 'auto'
+        }}
+      >
+        <TasksContainer themeMode={themeMode} />
       </div>
-      <div style={{ opacity: isTimerActive ? 0 : 1, transition: 'opacity 0.8s ease-in-out' }}>
-        <Frame2 themeMode={themeMode} />
+      
+      {/* Audio Player - Center - Absolutely positioned to always stay centered */}
+      <div className="absolute left-1/2 -translate-x-1/2 bottom-0">
+        <PlayerContainer
+        songName={songName || 'Song Name'}
+        currentTime={currentTime || 0}
+        duration={duration || 0}
+        isPlaying={isPlaying || false}
+        onSeek={onSeek || (() => {})}
+        onPlayPause={onVolumePlayPause || (() => {})}
+        albumArtUrl={albumArtUrl}
+        themeMode={themeMode}
+        onLongPress={onVolumeLongPress}
+        audioPlayerRef={audioPlayerRef}
+      />
       </div>
     </div>
   );
@@ -357,8 +535,19 @@ export default function Home({
   onVolumeLongPress,
   timeRemaining,
   onClockClick,
+  onMinuteHandDrag,
+  onMinuteHandDragEnd,
+  onTimeButtonClick,
+  draggedMinutes,
+  showTimerSelector,
   themeMode,
-  onToggleDarkMode
+  onToggleDarkMode,
+  songName,
+  currentTime,
+  duration,
+  onSeek,
+  albumArtUrl,
+  audioPlayerRef
 }: { 
   isTimerActive?: boolean;
   isPlaying?: boolean;
@@ -368,15 +557,44 @@ export default function Home({
   onVolumeLongPress?: () => void;
   timeRemaining?: number | null;
   onClockClick?: () => void;
+  onMinuteHandDrag?: (minutes: number) => void;
+  onMinuteHandDragEnd?: (minutes: number) => void;
+  onTimeButtonClick?: (minutes: number) => void;
+  draggedMinutes?: number | null;
+  showTimerSelector?: boolean;
   themeMode?: 'light' | 'dark' | 'color';
   onToggleDarkMode?: () => void;
+  songName?: string;
+  currentTime?: number;
+  duration?: number;
+  onSeek?: (progress: number) => void;
+  albumArtUrl?: string;
+  audioPlayerRef?: React.RefObject<AudioPlayerRef>;
 }) {
   return (
     <div className="bg-transparent overflow-clip relative w-full h-full min-h-screen" data-name="Home">
-      <Top isTimerActive={isTimerActive} themeMode={themeMode} onToggleDarkMode={onToggleDarkMode} />
-      <Ticker isTimerActive={isTimerActive} timeRemaining={timeRemaining} onClockClick={onClockClick} themeMode={themeMode} />
-      <Frame themeMode={themeMode} />
-      <Frame3 
+      <Top 
+        isTimerActive={isTimerActive} 
+        themeMode={themeMode} 
+        timeRemaining={timeRemaining}
+        onToggleDarkMode={onToggleDarkMode}
+      />
+      <Ticker 
+        isTimerActive={isTimerActive} 
+        timeRemaining={timeRemaining} 
+        onClockClick={onClockClick}
+        draggedMinutes={draggedMinutes}
+        onTimeButtonClick={onTimeButtonClick}
+        showTimerSelector={showTimerSelector}
+        themeMode={themeMode} 
+      />
+      <Frame 
+        themeMode={themeMode}
+        onMinuteHandDrag={onMinuteHandDrag}
+        onMinuteHandDragEnd={onMinuteHandDragEnd}
+        isTimerActive={isTimerActive}
+      />
+      <BottomBar 
         isPlaying={isPlaying}
         volume={volume}
         onVolumePlayPause={onVolumePlayPause}
@@ -384,6 +602,12 @@ export default function Home({
         onVolumeLongPress={onVolumeLongPress}
         isTimerActive={isTimerActive}
         themeMode={themeMode}
+        songName={songName}
+        currentTime={currentTime}
+        duration={duration}
+        onSeek={onSeek}
+        albumArtUrl={albumArtUrl}
+        audioPlayerRef={audioPlayerRef}
       />
     </div>
   );
