@@ -26,6 +26,11 @@ type MoodTheme =
 const BUILD_ID = '2.0';
 
 export default function App() {
+  // Set document title so you can confirm new deployment (tab shows "Focus App — v2.0")
+  useEffect(() => {
+    document.title = `Focus App — v${BUILD_ID}`;
+  }, []);
+
   // Loading State
   const [isLoading, setIsLoading] = useState(true);
   const [showContent, setShowContent] = useState(false);
@@ -556,10 +561,10 @@ export default function App() {
 
         {/* Build tag – confirms you're on the latest deployment (remove once verified) */}
         <div
-          className="fixed bottom-2 left-2 text-[10px] opacity-40 select-none pointer-events-none font-mono"
+          className="fixed bottom-3 left-3 text-xs font-medium opacity-70 select-none pointer-events-none font-mono bg-black/10 dark:bg-white/10 px-2 py-1 rounded"
           aria-hidden
         >
-          build {BUILD_ID}
+          v{BUILD_ID}
         </div>
       </div>
 
