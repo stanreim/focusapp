@@ -14,9 +14,9 @@ function PlusIcon({ themeMode }: { themeMode?: 'light' | 'dark' | 'color' }) {
   return (
     <div className="relative rounded-[4px] shrink-0 size-3 sm:size-4 lg:size-[16px]" data-name="Plus">
       <div className="overflow-clip relative rounded-[inherit] size-full flex items-center justify-center">
-        <Plus size={10} className={`transition-colors duration-500 ${themeMode === 'light' ? 'text-[#bdbdbd]' : 'text-[#666]'}`} strokeWidth={2} />
+        <Plus size={10} className={`transition-colors duration-500 ${themeMode === 'light' ? 'text-[#bdbdbd]' : 'text-[#FFFFFF]'}`} strokeWidth={2} />
       </div>
-      <div aria-hidden="true" className={`absolute border border-solid inset-0 pointer-events-none rounded-[4px] transition-colors duration-500 ${themeMode === 'light' ? 'border-[#ccc]' : 'border-[#444]'}`} />
+      <div aria-hidden="true" className={`absolute border border-solid inset-0 pointer-events-none rounded-[4px] transition-colors duration-500 ${themeMode === 'light' ? 'border-[#ccc]' : 'border-[#cccccc]'}`} />
     </div>
   );
 }
@@ -236,7 +236,7 @@ export function TodoList({ themeMode }: { themeMode?: 'light' | 'dark' | 'color'
   return (
     <div 
       ref={listRef}
-      className="content-stretch flex flex-col gap-3 items-start justify-center relative shrink-0 w-full" 
+      className="content-stretch flex flex-col gap-4 items-start justify-center relative shrink-0 w-full" 
       data-name="List"
       onPointerDown={handleContainerPointerDown}
     >
@@ -252,7 +252,7 @@ export function TodoList({ themeMode }: { themeMode?: 'light' | 'dark' | 'color'
             draggedId === todo.id ? 'opacity-50 scale-[1.02]' : ''
           } ${
             dragOverId === todo.id && draggedId !== todo.id
-              ? (themeMode === 'light' ? 'bg-black/5 rounded' : 'bg-white/5 rounded') 
+              ? (themeMode === 'light' ? 'bg-black/5 rounded' : 'bg-white/10 rounded')
               : ''
           }`}
           data-name="Task"
@@ -268,13 +268,13 @@ export function TodoList({ themeMode }: { themeMode?: 'light' | 'dark' | 'color'
                 : "linear-gradient(158.875deg, rgb(60, 60, 60) 13.934%, rgb(50, 50, 50) 127.92%)"
             }}
           >
-            <div aria-hidden="true" className={`absolute border border-solid inset-0 pointer-events-none rounded-[4px] transition-colors duration-500 ${themeMode === 'light' ? 'border-[#ccc]' : 'border-[#444]'}`} />
+            <div aria-hidden="true" className={`absolute border border-solid inset-0 pointer-events-none rounded-[4px] transition-colors duration-500 ${themeMode === 'light' ? 'border-[#ccc]' : 'border-[#cccccc]'}`} />
             {todo.completed && (
               <div className="absolute inset-0 flex items-center justify-center">
                  <svg width="10" height="8" viewBox="0 0 10 8" fill="none" className="w-[70%] h-[70%]">
                     <path 
                       d="M1 4L3.5 6.5L9 1" 
-                      stroke={themeMode === 'light' ? "#666" : "#999"} 
+                      stroke={themeMode === 'light' ? '#666' : '#FFFFFF'} 
                       strokeWidth="1.5" 
                       strokeLinecap="round" 
                       strokeLinejoin="round"
@@ -295,17 +295,13 @@ export function TodoList({ themeMode }: { themeMode?: 'light' | 'dark' | 'color'
                  onChange={(e) => setEditText(e.target.value)}
                  onBlur={handleEditSave}
                  onKeyDown={handleEditKeyDown}
-                 className={`font-['SF_Pro:Medium',sans-serif] font-[510] text-xs sm:text-sm lg:text-[14px] bg-transparent border-none outline-none w-full p-0 m-0 h-auto leading-[normal] transition-colors duration-500 ${themeMode === 'light' ? 'text-black' : 'text-white'}`}
+                 className={`font-['SF_Pro:Medium',sans-serif] font-[510] text-xs sm:text-sm lg:text-[14px] bg-transparent border-none outline-none w-full p-0 m-0 h-auto leading-[normal] transition-colors duration-500 ${themeMode === 'light' ? 'text-black' : 'text-[#FFFFFF]'}`}
                  style={{ fontVariationSettings: "'wdth' 100" }}
                />
             ) : (
               <p 
                 onClick={() => startEditing(todo)}
-                className={`font-['SF_Pro:Medium',sans-serif] font-[510] leading-[1.4] relative text-xs sm:text-sm lg:text-[14px] text-left cursor-text w-full break-words transition-colors duration-500 ${
-                  todo.completed 
-                    ? (themeMode === 'light' ? 'text-[#bdbdbd] line-through' : 'text-[#666] line-through')
-                    : (themeMode === 'light' ? 'text-black' : 'text-white')
-                }`} 
+                className={`font-['SF_Pro:Medium',sans-serif] font-[510] leading-[1.4] relative text-xs sm:text-sm lg:text-[14px] text-left cursor-text w-full break-words transition-colors duration-500 ${todo.completed ? 'line-through opacity-70' : ''} ${themeMode === 'light' ? (todo.completed ? 'text-[#bdbdbd]' : 'text-black') : 'text-[#FFFFFF]'}`} 
                 style={{ fontVariationSettings: "'wdth' 100" }}
               >
                 {todo.text}
@@ -319,10 +315,10 @@ export function TodoList({ themeMode }: { themeMode?: 'light' | 'dark' | 'color'
               e.stopPropagation();
               deleteTodo(todo.id);
             }}
-            className={`opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded cursor-pointer shrink-0 mt-[-2px] ${themeMode === 'light' ? 'hover:bg-black/5' : 'hover:bg-white/5'}`}
+            className={`opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded cursor-pointer shrink-0 mt-[-2px] ${themeMode === 'light' ? 'hover:bg-black/5' : 'hover:bg-white/10'}`}
             title="Delete task"
           >
-            <X size={14} className={`transition-colors duration-500 ${themeMode === 'light' ? 'text-[#999]' : 'text-[#666]'}`} />
+            <X size={14} className={`transition-colors duration-500 ${themeMode === 'light' ? 'text-[#999]' : 'text-[#FFFFFF]'}`} />
           </button>
         </div>
       ))}
@@ -340,15 +336,15 @@ export function TodoList({ themeMode }: { themeMode?: 'light' | 'dark' | 'color'
                onBlur={handleAddTodo}
                onKeyDown={handleKeyDown}
                placeholder="Enter task..."
-               className={`font-['SF_Pro:Medium',sans-serif] font-[510] text-xs sm:text-sm lg:text-[14px] bg-transparent border-none outline-none w-full p-0 m-0 leading-[normal] transition-colors duration-500 ${themeMode === 'light' ? 'text-black placeholder:text-[#bdbdbd]' : 'text-white placeholder:text-[#666]'}`}
+               className={`font-['SF_Pro:Medium',sans-serif] font-[510] text-xs sm:text-sm lg:text-[14px] bg-transparent border-none outline-none w-full p-0 m-0 leading-[normal] transition-colors duration-500 ${themeMode === 'light' ? 'text-black placeholder:text-[#bdbdbd]' : 'text-[#FFFFFF] placeholder:text-[#FFFFFF]/60'}`}
                style={{ fontVariationSettings: "'wdth' 100" }}
              />
            ) : (
-             <p 
-               onClick={() => setIsAdding(true)}
-               className={`font-['SF_Pro:Medium',sans-serif] font-[510] leading-[normal] relative shrink-0 text-xs sm:text-sm lg:text-[14px] text-left cursor-pointer transition-colors duration-500 w-full ${themeMode === 'light' ? 'text-[#bdbdbd] hover:text-[#999]' : 'text-[#666] hover:text-[#888]'}`} 
-               style={{ fontVariationSettings: "'wdth' 100" }}
-             >
+            <p 
+              onClick={() => setIsAdding(true)}
+              className={`font-['SF_Pro:Medium',sans-serif] font-[510] leading-[normal] relative shrink-0 text-xs sm:text-sm lg:text-[14px] text-left cursor-pointer transition-colors duration-500 w-full ${themeMode === 'light' ? 'text-[#bdbdbd] hover:text-[#999]' : 'text-[#FFFFFF]/80 hover:text-[#FFFFFF]'}`} 
+              style={{ fontVariationSettings: "'wdth' 100" }}
+            >
                Add to-do
              </p>
            )}

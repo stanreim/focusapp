@@ -2,10 +2,9 @@ import { useState, useEffect, useRef } from 'react';
 import { AudioPlayer, AudioPlayerRef } from '@/app/components/AudioPlayer';
 import { HomeWrapper } from '@/app/components/HomeWrapper';
 import { SoundPickerModal } from '@/app/components/SoundPickerModal';
-import { Waves } from '@/components/ui/wave-background';
+import { WatchfacePickerPanel } from '@/app/components/WatchfacePickerPanel';
 import BlurTextAnimation from '@/components/ui/blur-text-animation';
 import Home from '@/imports/Home-7-86';
-import mood2Image from '@/assets/d0fce7ad287e0b2ca22377f22ff629fcdd4a6726.png';
 import { hapticSounds } from '@/app/hooks/useHapticSound';
 
 interface Song {
@@ -17,13 +16,23 @@ interface Song {
   isCustom?: boolean;
 }
 
-// Define the structure for mood themes
-type MoodTheme = 
-  | { type: 'waves'; bg: string; stroke: string }
-  | { type: 'image'; src: string; bg: string };
-
 // Build ID – visible on the page so you can confirm the deployed version
 const BUILD_ID = '2.0';
+
+// Backgrounds use same numeric indices as watchfaces: assets/Backgrounds/Background-0.png … Background-4.png
+const WATCHFACE_BACKGROUND_IDS = [0, 1, 2, 3, 4] as const;
+const BACKGROUNDS: (string | null)[] = WATCHFACE_BACKGROUND_IDS.map((i) =>
+  i === 0 ? null : `/assets/Backgrounds/Background-${i}.png`
+);
+
+// Watchface index (0–4) → theme. Hover previews and selection apply this theme to the watch and UI.
+const WATCHFACE_THEMES: ('light' | 'dark' | 'color')[] = [
+  'light',  // 0
+  'dark',   // 1
+  'color',  // 2
+  'dark',   // 3
+  'color',  // 4
+];
 
 export default function App() {
   useEffect(() => {
@@ -37,7 +46,17 @@ export default function App() {
   const [isTimerActive, setIsTimerActive] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentMood, setCurrentMood] = useState(0); // 0-3
-  const [themeMode, setThemeMode] = useState<'light' | 'dark' | 'color'>('light');
+  const [themeMode, setThemeMode] = useState<'light' | 'dark' | 'color'>(() => {
+    try {
+      const saved = localStorage.getItem('zenoApp_selectedWatchfaceIndex');
+      if (saved == null) return 'light';
+      const n = parseInt(saved, 10);
+      const index = Number.isNaN(n) ? 0 : Math.min(Math.max(0, n), 4);
+      return WATCHFACE_THEMES[index];
+    } catch {
+      return 'light';
+    }
+  });
   const [sessionLength, setSessionLength] = useState<number | null>(null);
   const [startTime, setStartTime] = useState<number | null>(null);
   const [timeRemaining, setTimeRemaining] = useState<number | null>(null);
@@ -46,6 +65,19 @@ export default function App() {
   const [showTimerSelector, setShowTimerSelector] = useState(false);
   const [volume, setVolume] = useState(0.7); // Default volume 70%
   const [showSoundPicker, setShowSoundPicker] = useState(false);
+  const [showWatchfacePicker, setShowWatchfacePicker] = useState(false);
+  const [previewBackgroundIndex, setPreviewBackgroundIndex] = useState<number | null>(null);
+  const [selectedWatchfaceIndex, setSelectedWatchfaceIndex] = useState<number>(() => {
+    try {
+      const saved = localStorage.getItem('zenoApp_selectedWatchfaceIndex');
+      if (saved == null) return 0;
+      const n = parseInt(saved, 10);
+      return Number.isNaN(n) ? 0 : Math.min(Math.max(0, n), 4);
+    } catch {
+      return 0;
+    }
+  });
+  const panelOpenAtWatchfaceRef = useRef<number>(0);
   const [customSongs, setCustomSongs] = useState<Song[]>(() => {
     // Load custom songs from localStorage on initial render
     try {
@@ -66,7 +98,7 @@ export default function App() {
   });
   const [showVolumeFeedback, setShowVolumeFeedback] = useState(false);
   const volumeFeedbackTimerRef = useRef<NodeJS.Timeout | null>(null);
-  
+
   // Audio player state for UI
   const [audioCurrentTime, setAudioCurrentTime] = useState(0);
   const [audioDuration, setAudioDuration] = useState(0);
@@ -84,14 +116,6 @@ export default function App() {
         setShowContent(true);
     }, 500);
   };
-
-  // Background Theme Configurations based on Mood
-  const moodThemes: MoodTheme[] = [
-    { type: 'waves', bg: "#fcfcfc", stroke: "rgba(90, 90, 90, 0.18)" }, // Mood 0: Default White/Gray
-    { type: 'waves', bg: "#f0fdf4", stroke: "rgba(22, 163, 74, 0.15)" }, // Mood 1: Green/Nature
-    { type: 'image', src: mood2Image, bg: "#f5f5f5" },                   // Mood 2: Custom Image (Fog/Cloud)
-    { type: 'waves', bg: "#faf5ff", stroke: "rgba(147, 51, 234, 0.15)" }  // Mood 3: Purple/Night
-  ];
 
   const moods = [
     {
@@ -188,6 +212,14 @@ export default function App() {
     }
   }, [selectedSongId]);
 
+  useEffect(() => {
+    try {
+      localStorage.setItem('zenoApp_selectedWatchfaceIndex', String(selectedWatchfaceIndex));
+    } catch (e) {
+      console.warn('Failed to save selected watchface to localStorage:', e);
+    }
+  }, [selectedWatchfaceIndex]);
+
   // Update time remaining
   useEffect(() => {
     if (!isPlaying || !startTime || !sessionLength) return;
@@ -210,8 +242,6 @@ export default function App() {
 
     return () => clearInterval(interval);
   }, [isPlaying, startTime, sessionLength]);
-
-  // Background opacity removed - no backgrounds in focus mode
 
   const handleTimerButtonClick = () => {
     if (!isTimerActive) {
@@ -290,7 +320,6 @@ export default function App() {
   const handleScreenClick = (e: React.MouseEvent) => {
     if (isLoading) return; // Ignore clicks during loading
 
-    
     // Ignore click if it was a long press
     if (isLongPressRef.current) {
        isLongPressRef.current = false;
@@ -359,6 +388,27 @@ export default function App() {
     setShowSoundPicker(true);
   };
 
+  const handleOpenWatchfacePicker = () => {
+    hapticSounds.click();
+    const current = selectedWatchfaceIndex;
+    panelOpenAtWatchfaceRef.current = current;
+    setPreviewBackgroundIndex(current);
+    setThemeMode(WATCHFACE_THEMES[current]);
+    setShowWatchfacePicker(true);
+  };
+
+
+  const handleCloseWatchfacePicker = () => {
+    setShowWatchfacePicker(false);
+    setPreviewBackgroundIndex(null);
+  };
+
+  const handleSelectWatchface = (index: number) => {
+    setSelectedWatchfaceIndex(index);
+    setThemeMode(WATCHFACE_THEMES[index]);
+    setShowWatchfacePicker(false);
+  };
+
   const handleCloseSoundPicker = () => {
     setShowSoundPicker(false);
   };
@@ -425,13 +475,22 @@ export default function App() {
     return moods[currentMood].audio;
   };
 
+  // When panel is open, use preview; if not set yet (first paint), use index at open so we never flash to background-0
+  const effectiveBackgroundIndex =
+    showWatchfacePicker && previewBackgroundIndex === null
+      ? panelOpenAtWatchfaceRef.current
+      : previewBackgroundIndex ?? selectedWatchfaceIndex;
+  const effectiveBg = BACKGROUNDS[effectiveBackgroundIndex];
+  const effectiveTheme = showWatchfacePicker
+    ? WATCHFACE_THEMES[effectiveBackgroundIndex]
+    : themeMode;
+  // Watchface 1–4: use bright (light) theme for all UI; watchface 0 unchanged
+  const uiTheme =
+    effectiveBackgroundIndex >= 1 && effectiveBackgroundIndex <= 4 ? 'light' : effectiveTheme;
+
   return (
     <div 
-      className={`fixed inset-0 overflow-hidden transition-colors duration-500 ${
-        themeMode === 'dark' ? 'bg-[#111]' : 
-        themeMode === 'color' ? 'bg-[#56329d]' : 
-        'bg-[#ededed]'
-      }`} 
+      className="fixed inset-0 overflow-hidden"
       onClick={handleScreenClick}
       data-build={BUILD_ID}
       onMouseDown={handlePointerDown}
@@ -441,12 +500,27 @@ export default function App() {
       onTouchEnd={handlePointerUp}
       onWheel={handleWheel}
     >
-      {/* Loading Overlay */}
+      {/* Background: always show watchface image when available; theme overlay for dark/color */}
+      <div
+        className="absolute inset-0 z-0 transition-[background,background-color,background-image] duration-500 ease-out"
+        style={
+          effectiveBg == null
+            ? { background: effectiveTheme === 'light' ? '#ededed' : effectiveTheme === 'dark' ? '#111' : '#56329d' }
+            : {
+                backgroundImage: `url(${effectiveBg})`,
+                backgroundSize: 'cover',
+                backgroundPosition: 'center',
+              }
+        }
+        aria-hidden
+      />
+      {/* No theme overlay on watchphase backgrounds — show images as-is */}
+      {/* Loading Overlay — uses uiTheme so watchface 1–4 show bright loading */}
       <div 
         className={`absolute inset-0 z-[100] transition-opacity duration-1000 ease-in-out ${
-          themeMode === 'dark' ? 'bg-[#111]' : 
-          themeMode === 'color' ? 'bg-[#56329d]' : 
-          'bg-[#ededed]'
+          uiTheme === 'dark' ? 'bg-[#111]' : 
+          uiTheme === 'color' ? 'bg-[#56329d]' : 
+          'bg-[#EAEAEA]'
         } ${isLoading ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}
       >
         {isLoading && (
@@ -455,11 +529,11 @@ export default function App() {
                 loop={false}
                 onComplete={handleLoadingComplete}
                 className={
-                  themeMode === 'dark' ? 'bg-[#111]' : 
-                  themeMode === 'color' ? 'bg-[#56329d]' : 
-                  'bg-[#ededed]'
+                  uiTheme === 'dark' ? 'bg-[#111]' : 
+                  uiTheme === 'color' ? 'bg-[#56329d]' : 
+                  'bg-[#EAEAEA]'
                 }
-                textColor={themeMode === 'light' ? 'text-black/80' : 'text-white/80'}
+                textColor={uiTheme === 'light' ? 'text-black/80' : 'text-white/80'}
                 fontSize="text-2xl md:text-3xl font-light tracking-widest"
             />
         )}
@@ -467,10 +541,9 @@ export default function App() {
 
       {/* Main Content Container - Fades in after loading */}
       <div 
-        className={`absolute inset-0 transition-opacity duration-1000 ease-in-out ${showContent ? 'opacity-100' : 'opacity-0'}`}
+        className={`absolute inset-0 z-10 flex transition-opacity duration-1000 ease-in-out ${showContent ? 'opacity-100' : 'opacity-0'}`}
       >
-        {/* Background Layer - Hidden in focus mode */}
-
+        <div className="flex-1 min-w-0 overflow-hidden flex flex-col relative">
         <AudioPlayer
           ref={audioPlayerRef}
           src={getCurrentAudioSource()}
@@ -491,8 +564,8 @@ export default function App() {
             zIndex: 10,
           }}
         >
-          <HomeWrapper 
-          onTimerClick={handleTimerButtonClick} 
+          <HomeWrapper
+          onTimerClick={handleTimerButtonClick}
           isTimerActive={isTimerActive}
           isPlaying={isPlaying}
           volume={volume}
@@ -500,7 +573,7 @@ export default function App() {
           onVolumeChange={handleVolumeChange}
           onVolumeLongPress={handleOpenSoundPicker}
         >
-          <Home 
+          <Home
             isTimerActive={isTimerActive}
             isPlaying={isPlaying}
             volume={volume}
@@ -509,12 +582,14 @@ export default function App() {
             onVolumeLongPress={handleOpenSoundPicker}
             timeRemaining={timeRemaining}
             onClockClick={handleClockClick}
+            onOpenWatchfacePicker={handleOpenWatchfacePicker}
             onTimeButtonClick={handleTimeButtonClick}
             onMinuteHandDrag={handleMinuteHandDrag}
             onMinuteHandDragEnd={handleMinuteHandDragEnd}
             draggedMinutes={draggedMinutes}
             showTimerSelector={showTimerSelector}
-            themeMode={themeMode}
+            themeMode={effectiveTheme}
+            uiTheme={uiTheme}
             onToggleDarkMode={handleToggleDarkMode}
             songName={allSongs.find(s => s.id === selectedSongId)?.name || 'Song Name'}
             currentTime={audioCurrentTime}
@@ -522,10 +597,22 @@ export default function App() {
             onSeek={handleAudioSeek}
             albumArtUrl={allSongs.find(s => s.id === selectedSongId)?.imageUrl}
             audioPlayerRef={audioPlayerRef}
+            onOpenSoundPicker={handleOpenSoundPicker}
+            showWatchfacePicker={showWatchfacePicker}
           />
         </HomeWrapper>
         </div>
 
+
+        {/* Watchface picker side panel */}
+        <WatchfacePickerPanel
+          isOpen={showWatchfacePicker}
+          onClose={handleCloseWatchfacePicker}
+          onSelectWatchface={handleSelectWatchface}
+          onPreviewBackground={setPreviewBackgroundIndex}
+          selectedWatchfaceIndex={selectedWatchfaceIndex}
+          themeMode={effectiveTheme}
+        />
 
         {/* Sound picker modal */}
         {showSoundPicker && (
@@ -553,21 +640,12 @@ export default function App() {
                paddingBottom: 'env(safe-area-inset-bottom)'
              }}
           >
-             <div className={`backdrop-blur-md px-4 sm:px-6 py-1.5 sm:py-2 rounded-full shadow-sm text-xs sm:text-sm font-medium tracking-wide transition-colors duration-500 ${themeMode === 'light' ? 'bg-white/80 text-gray-600' : 'bg-white/20 text-white'}`}>
+             <div className={`backdrop-blur-md px-4 sm:px-6 py-1.5 sm:py-2 rounded-full shadow-sm text-xs sm:text-sm font-medium tracking-wide transition-colors duration-500 ${effectiveTheme === 'light' ? 'bg-white/80 text-gray-600' : 'bg-white/20 text-white'}`}>
                VOLUME {Math.round(volume * 100)}%
              </div>
           </div>
         )}
 
-        {/* Mood Switcher - removed for simplicity */}
-
-        {/* Build tag – confirms you're on the latest deployment (remove once verified) */}
-        <div
-          className="fixed bottom-3 left-3 text-[10px] sm:text-xs font-medium opacity-70 select-none pointer-events-none font-mono bg-black/10 dark:bg-white/10 px-2 py-1 rounded"
-          style={{ marginLeft: 'env(safe-area-inset-left)', marginBottom: 'max(0.75rem, env(safe-area-inset-bottom))' }}
-          aria-hidden
-        >
-          v{BUILD_ID}
         </div>
       </div>
 

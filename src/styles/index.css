@@ -14,6 +14,18 @@
   }
 }
 
+/* Focus toggle time selection rollout (Figma 61-5913) */
+@keyframes focusRollOut {
+  from {
+    opacity: 0;
+    transform: translateX(-12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
 /* Ensure full viewport usage */
 html, body, #root {
   margin: 0;

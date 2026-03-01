@@ -104,16 +104,21 @@ function VinylArtwork({
     };
   }, []);
 
+  const isDark = themeMode === 'dark' || themeMode === 'color';
+  const trackShadow = isDark
+    ? '3px 8px 15px rgba(0,0,0,0.25), 0 4px 10px -3px rgba(179,179,179,0.25)'
+    : '0px 4px 8px 0px rgba(0,0,0,0.54), 3px 28px 27px 0px rgba(0,0,0,0.22)';
+
   return (
     <div 
-      className="relative shrink-0 size-14 sm:size-16 lg:size-[72px] shadow-[0px_4px_8px_0px_rgba(0,0,0,0.54),3px_28px_27px_0px_rgba(0,0,0,0.22)] rounded-full overflow-hidden cursor-pointer transition-transform hover:scale-105 active:scale-95 flex-shrink-0"
+      className="relative shrink-0 size-14 sm:size-16 lg:size-[72px] rounded-full overflow-hidden cursor-pointer transition-transform hover:scale-105 active:scale-95 flex-shrink-0"
       data-name="Track"
       onClick={handleClick}
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
       onPointerLeave={handlePointerUp}
-      style={{ borderRadius: '50%', touchAction: 'manipulation' }}
+      style={{ borderRadius: '50%', touchAction: 'manipulation', boxShadow: trackShadow }}
     >
       <div
         className="size-full"
@@ -131,31 +136,26 @@ function VinylArtwork({
         ) : (
           <div 
             className={`size-full transition-colors duration-500 ${
-              themeMode === 'light' ? 'bg-gradient-to-br from-[#333] to-[#111]' : 'bg-gradient-to-br from-[#555] to-[#222]'
+              themeMode === 'light' ? 'bg-gradient-to-br from-[#333] to-[#111]' : 'bg-[#d9d9d9]'
             }`}
           />
         )}
       </div>
-      {/* Center hole overlay */}
+      {/* Center hole overlay: dark = white with inner shadows per Figma */}
       <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 size-[12px] pointer-events-none z-10">
-        <svg viewBox="0 0 12 12" className="size-full">
-          <circle 
-            cx="6" 
-            cy="6" 
-            r="5.5" 
-            fill="none" 
-            stroke={themeMode === 'light' ? '#ededed' : '#222'} 
-            strokeWidth="1"
-            className="transition-colors duration-500"
+        {isDark ? (
+          <div
+            className="size-full rounded-full bg-white"
+            style={{
+              boxShadow: 'inset 0 4px 4px rgba(0,0,0,0.1), inset 1px -3px 4px rgba(0,0,0,0.2)',
+            }}
           />
-          <circle 
-            cx="6" 
-            cy="6" 
-            r="3" 
-            fill={themeMode === 'light' ? '#ededed' : '#222'}
-            className="transition-colors duration-500"
-          />
-        </svg>
+        ) : (
+          <svg viewBox="0 0 12 12" className="size-full">
+            <circle cx="6" cy="6" r="5.5" fill="none" stroke="#ededed" strokeWidth="1" />
+            <circle cx="6" cy="6" r="3" fill="#ededed" />
+          </svg>
+        )}
       </div>
       <style>{`
         @keyframes vinyl-rotate {
@@ -183,25 +183,24 @@ function WaveformBar({
   // Clamp height to valid range
   const clampedHeight = Math.max(MIN_HEIGHT, Math.min(MAX_HEIGHT, height));
   
+  const isDark = themeMode === 'dark' || themeMode === 'color';
   if (isPlayed) {
     return (
       <div 
         className="shrink-0 w-px transition-all duration-[50ms] ease-out" 
         style={{ 
           height: `${clampedHeight}px`,
-          backgroundImage: themeMode === 'light' 
-            ? "linear-gradient(to bottom, rgb(102, 102, 102), rgb(0, 0, 0))"
-            : "linear-gradient(to bottom, rgb(200, 200, 200), rgb(150, 150, 150))",
+          backgroundColor: isDark ? '#fff' : undefined,
+          backgroundImage: !isDark ? "linear-gradient(to bottom, rgb(102, 102, 102), rgb(0, 0, 0))" : undefined,
           willChange: 'height'
         }} 
       />
     );
   }
-  
   return (
     <div 
-      className={`shrink-0 w-px opacity-30 transition-all duration-[50ms] ease-out ${
-        themeMode === 'light' ? 'bg-[#bdbdbd]' : 'bg-[#666]'
+      className={`shrink-0 w-px transition-all duration-[50ms] ease-out ${
+        themeMode === 'light' ? 'bg-[#bdbdbd] opacity-30' : 'bg-[#bdbdbd]'
       }`}
       style={{ 
         height: `${clampedHeight}px`,
@@ -339,33 +338,36 @@ export function AudioPlayerUI({
           data-name="Song"
         >
           <p 
-            className={`font-['SF_Pro:Medium',sans-serif] font-[510] relative shrink-0 text-xs sm:text-sm transition-colors duration-500 truncate max-w-full ${
-              themeMode === 'light' ? 'text-[#111]' : 'text-white'
-            }`}
+            className={`font-['SF_Pro:Medium',sans-serif] font-[510] relative shrink-0 text-xs sm:text-sm transition-colors duration-500 truncate max-w-full ${themeMode === 'light' ? 'text-[#111]' : 'text-white'}`}
             style={{ fontVariationSettings: "'wdth' 100" }}
           >
             {songName}
           </p>
           <p 
-            className={`font-['SF_Pro:Regular',sans-serif] font-normal relative shrink-0 text-[10px] sm:text-xs transition-colors duration-500 ${
-              themeMode === 'light' ? 'text-[#bdbdbd]' : 'text-[#666]'
-            }`}
+            className={`font-['SF_Pro:Regular',sans-serif] font-normal relative shrink-0 text-[10px] sm:text-xs transition-colors duration-500 ${themeMode === 'light' ? 'text-[#bdbdbd]' : 'text-white'}`}
             style={{ fontVariationSettings: "'wdth' 100" }}
           >
             {duration > 0 ? `${formatTime(currentTime)} / ${formatTime(duration)}` : formatTime(currentTime)}
           </p>
         </div>
         
-        {/* Waveform Visualization */}
+        {/* Waveform — bright (watchface-0): solid #e4e4e4. Dark/color: frosted glass */}
         <div 
           ref={waveformRef}
           onClick={handleWaveformClick}
           onPointerMove={handleWaveformDrag}
-          className={`content-stretch flex gap-1 sm:gap-[4px] h-10 sm:h-12 items-center overflow-clip px-2 sm:px-3 py-1 sm:py-[4px] relative rounded-full shrink-0 w-full min-w-0 cursor-pointer transition-colors duration-500 ${
-            themeMode === 'light' ? 'bg-[#e4e4e4]' : 'bg-[#2a2a2a]'
-          }`}
+          className={`content-stretch flex gap-1 sm:gap-[4px] h-10 sm:h-12 items-center overflow-clip px-2 sm:px-3 py-1 sm:py-[4px] relative rounded-full shrink-0 w-full min-w-0 cursor-pointer transition-all duration-500 ${themeMode === 'light' ? 'bg-[#e4e4e4]' : 'border border-white/25'}`}
           data-name="Audiowave"
-          style={{ touchAction: 'none' }}
+          style={ 
+            themeMode === 'light'
+              ? { touchAction: 'none' as const }
+              : { 
+                  touchAction: 'none' as const,
+                  background: 'rgba(255, 255, 255, 0.45)',
+                  backdropFilter: 'blur(40px)',
+                  WebkitBackdropFilter: 'blur(40px)',
+                }
+          }
         >
           {/* Waveform bars */}
           <div className="content-stretch flex gap-[4px] items-center relative flex-1">
@@ -378,9 +380,9 @@ export function AudioPlayerUI({
               />
             ))}
           </div>
-          
-          {/* Inset shadow overlay */}
-          <div className="absolute inset-0 pointer-events-none rounded-[inherit] shadow-[inset_2px_0px_12px_-3px_rgba(0,0,0,0.12),inset_0px_8px_9px_-7px_rgba(0,0,0,0.08)]" />
+          {themeMode === 'light' && (
+            <div className="absolute inset-0 pointer-events-none rounded-[inherit] shadow-[inset_2px_0px_12px_-3px_rgba(0,0,0,0.12),inset_0px_8px_9px_-7px_rgba(0,0,0,0.08)]" />
+          )}
         </div>
       </div>
     </div>
