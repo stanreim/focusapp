@@ -14,15 +14,15 @@
   }
 }
 
-/* Focus toggle time selection rollout (Figma 61-5913) */
-@keyframes focusRollOut {
+/* Focus time buttons: smooth reveal below toggle (fade + slide up) */
+@keyframes focusTimeReveal {
   from {
     opacity: 0;
-    transform: translateX(-12px);
+    transform: translateY(8px);
   }
   to {
     opacity: 1;
-    transform: translateX(0);
+    transform: translateY(0);
   }
 }
 

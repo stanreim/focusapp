@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { AudioPlayer, AudioPlayerRef } from '@/app/components/AudioPlayer';
 import { HomeWrapper } from '@/app/components/HomeWrapper';
-import { SoundPickerModal } from '@/app/components/SoundPickerModal';
+import { MusicPickerPanel } from '@/app/components/MusicPickerPanel';
 import { WatchfacePickerPanel } from '@/app/components/WatchfacePickerPanel';
 import BlurTextAnimation from '@/components/ui/blur-text-animation';
 import Home from '@/imports/Home-7-86';
@@ -14,6 +14,7 @@ interface Song {
   audioUrl: string;
   imageUrl?: string;
   isCustom?: boolean;
+  subtitle?: string;
 }
 
 // Build ID – visible on the page so you can confirm the deployed version
@@ -33,6 +34,22 @@ const WATCHFACE_THEMES: ('light' | 'dark' | 'color')[] = [
   'dark',   // 3
   'color',  // 4
 ];
+
+// Loading screen greetings — rotate one per day (day-of-year % 5) to set focus and calm.
+const LOADING_GREETINGS = [
+  "Where attention goes, energy flows.",
+  "Breathe in focus. Breathe out distraction.",
+  "One task, one moment, one breath.",
+  "Calm mind. Clear intention. Steady focus.",
+  "Be here now. Everything else can wait.",
+];
+
+function getLoadingGreetingForToday(): string {
+  const now = new Date();
+  const start = new Date(now.getFullYear(), 0, 0);
+  const dayOfYear = Math.floor((now.getTime() - start.getTime()) / (24 * 60 * 60 * 1000));
+  return LOADING_GREETINGS[dayOfYear % LOADING_GREETINGS.length];
+}
 
 export default function App() {
   useEffect(() => {
@@ -64,6 +81,12 @@ export default function App() {
   const [draggedMinutes, setDraggedMinutes] = useState<number | null>(null);
   const [showTimerSelector, setShowTimerSelector] = useState(false);
   const [volume, setVolume] = useState(0.7); // Default volume 70%
+  const [isMuted, setIsMuted] = useState(false);
+  const savedVolumeRef = useRef(0.7); // volume before mute, for unmute
+  const allSongsRef = useRef<Song[]>([]);
+  const selectedSongIdRef = useRef<string>('song-1');
+  const volumeRef = useRef(volume);
+  const isMutedRef = useRef(isMuted);
   const [showSoundPicker, setShowSoundPicker] = useState(false);
   const [showWatchfacePicker, setShowWatchfacePicker] = useState(false);
   const [previewBackgroundIndex, setPreviewBackgroundIndex] = useState<number | null>(null);
@@ -154,7 +177,7 @@ export default function App() {
     return FALLBACK_IMAGES[index];
   };
 
-  // Create song list for picker - using actual audio files from assets
+  // Create song list for picker - using actual audio files from assets. Subtitles from top to bottom: Calm, Focused, Energised, Funky, Brazilian moods.
   const allSongs: Song[] = [
     {
       id: 'song-1',
@@ -162,6 +185,7 @@ export default function App() {
       duration: '∞',
       audioUrl: '/assets/3 Petits Bouts de Choux (Cover).mp3',
       imageUrl: getSongImageUrl('song-1', '3 Petits Bouts de Choux (Cover)'),
+      subtitle: 'Calm',
     },
     {
       id: 'song-2',
@@ -169,6 +193,7 @@ export default function App() {
       duration: '∞',
       audioUrl: '/assets/Dreams of Glass.mp3',
       imageUrl: getSongImageUrl('song-2', 'Dreams of Glass'),
+      subtitle: 'Focused',
     },
     {
       id: 'song-3',
@@ -176,6 +201,7 @@ export default function App() {
       duration: '∞',
       audioUrl: '/assets/Vive le Plein air.mp3',
       imageUrl: getSongImageUrl('song-3', 'Vive le Plein air'),
+      subtitle: 'Energised',
     },
     {
       id: 'song-4',
@@ -183,6 +209,7 @@ export default function App() {
       duration: '∞',
       audioUrl: '/assets/Funcky Day Cover.mp3',
       imageUrl: getSongImageUrl('song-4', 'Funcky Day Cover'),
+      subtitle: 'Funky',
     },
     {
       id: 'song-5',
@@ -190,6 +217,7 @@ export default function App() {
       duration: '∞',
       audioUrl: '/assets/Sabe Jogar Cover.mp3',
       imageUrl: getSongImageUrl('song-5', 'Sabe Jogar Cover'),
+      subtitle: 'Brazilian moods',
     },
     ...customSongs,
   ];
@@ -232,6 +260,7 @@ export default function App() {
         setTimeRemaining(0);
         setSessionEnded(true);
         setIsPlaying(false);
+        setIsTimerActive(false); // Exit focus mode so UI fades back in
         // Play triumphant success sound when session completes
         hapticSounds.success();
         clearInterval(interval);
@@ -329,6 +358,7 @@ export default function App() {
     const target = e.target as HTMLElement;
     
     if (target.closest('[data-name="Ticker"]')) return;
+    if (target.closest('[data-name="MusicPicker"]')) return;
 
     if (target.closest('[data-name="Timer"]') || 
         target.closest('[data-name="Toggle"]') ||
@@ -372,6 +402,18 @@ export default function App() {
 
   const handleVolumeChange = (newVolume: number) => {
     setVolume(newVolume);
+    if (newVolume > 0) setIsMuted(false);
+  };
+
+  const handleMuteUnmute = () => {
+    if (isMuted) {
+      setVolume(savedVolumeRef.current);
+      setIsMuted(false);
+    } else {
+      savedVolumeRef.current = volume;
+      setVolume(0);
+      setIsMuted(true);
+    }
   };
 
   const handleToggleDarkMode = () => {
@@ -475,6 +517,110 @@ export default function App() {
     return moods[currentMood].audio;
   };
 
+  // Keep refs in sync for keyboard handler
+  allSongsRef.current = allSongs;
+  selectedSongIdRef.current = selectedSongId;
+  volumeRef.current = volume;
+  isMutedRef.current = isMuted;
+
+  // Don't trigger keyboard shortcuts when user is typing in an input
+  const isTypingInInput = () => {
+    const el = document.activeElement;
+    if (!el || !(el instanceof HTMLElement)) return false;
+    const tag = el.tagName.toLowerCase();
+    if (tag === 'input' || tag === 'textarea' || tag === 'select') return true;
+    if (el.isContentEditable) return true;
+    return false;
+  };
+
+  // Global keyboard shortcuts: play/pause, volume, mute, previous/next track, eject
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (isTypingInInput()) return;
+
+      const code = e.code;
+      const key = e.key.toLowerCase();
+
+      // Play / Pause — Space or MediaPlayPause
+      if (code === 'Space' || code === 'MediaPlayPause') {
+        e.preventDefault();
+        setIsPlaying((p) => !p);
+        return;
+      }
+
+      // Volume Up — ArrowUp or VolumeUp
+      if (code === 'ArrowUp' || code === 'VolumeUp') {
+        e.preventDefault();
+        setIsMuted(false);
+        setVolume((v) => Math.min(1, v + 0.05));
+        setShowVolumeFeedback(true);
+        if (volumeFeedbackTimerRef.current) clearTimeout(volumeFeedbackTimerRef.current);
+        volumeFeedbackTimerRef.current = setTimeout(() => setShowVolumeFeedback(false), 1500);
+        return;
+      }
+
+      // Volume Down — ArrowDown or VolumeDown
+      if (code === 'ArrowDown' || code === 'VolumeDown') {
+        e.preventDefault();
+        setIsMuted(false);
+        setVolume((v) => Math.max(0, v - 0.05));
+        setShowVolumeFeedback(true);
+        if (volumeFeedbackTimerRef.current) clearTimeout(volumeFeedbackTimerRef.current);
+        volumeFeedbackTimerRef.current = setTimeout(() => setShowVolumeFeedback(false), 1500);
+        return;
+      }
+
+      // Mute / Unmute — m, M, or VolumeMute
+      if (key === 'm' || code === 'VolumeMute') {
+        e.preventDefault();
+        if (isMutedRef.current) {
+          setVolume(savedVolumeRef.current);
+          setIsMuted(false);
+        } else {
+          savedVolumeRef.current = volumeRef.current;
+          setVolume(0);
+          setIsMuted(true);
+        }
+        return;
+      }
+
+      // Previous track — MediaTrackPrevious or ArrowLeft
+      if (code === 'MediaTrackPrevious' || code === 'ArrowLeft') {
+        e.preventDefault();
+        const songs = allSongsRef.current;
+        const idx = songs.findIndex((s) => s.id === selectedSongIdRef.current);
+        const newIdx = idx <= 0 ? songs.length - 1 : idx - 1;
+        setSelectedSongId(songs[newIdx].id);
+        setIsPlaying((p) => (p ? p : true));
+        return;
+      }
+
+      // Next track — MediaTrackNext or ArrowRight
+      if (code === 'MediaTrackNext' || code === 'ArrowRight') {
+        e.preventDefault();
+        const songs = allSongsRef.current;
+        const idx = songs.findIndex((s) => s.id === selectedSongIdRef.current);
+        const newIdx = idx < 0 || idx >= songs.length - 1 ? 0 : idx + 1;
+        setSelectedSongId(songs[newIdx].id);
+        setIsPlaying((p) => (p ? p : true));
+        return;
+      }
+
+      // Eject — close sound picker if open, otherwise stop playback
+      if (code === 'Eject') {
+        e.preventDefault();
+        setShowSoundPicker((open) => {
+          if (open) return false;
+          setIsPlaying(false);
+          return open;
+        });
+        return;
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
   // When panel is open, use preview; if not set yet (first paint), use index at open so we never flash to background-0
   const effectiveBackgroundIndex =
     showWatchfacePicker && previewBackgroundIndex === null
@@ -525,7 +671,7 @@ export default function App() {
       >
         {isLoading && (
             <BlurTextAnimation 
-                text="Where attention goes, energy flows." 
+                text={getLoadingGreetingForToday()} 
                 loop={false}
                 onComplete={handleLoadingComplete}
                 className={
@@ -549,21 +695,13 @@ export default function App() {
           src={getCurrentAudioSource()}
           isPlaying={isPlaying}
           moodKey={currentMood}
-          volume={volume}
+          volume={isMuted ? 0 : volume}
           onProgress={handleAudioProgress}
           onDuration={handleAudioDuration}
         />
 
-        {/* Home UI - always visible */}
-        <div
-          style={{
-            opacity: showSoundPicker ? 0 : 1,
-            transition: 'opacity 0.4s ease-in-out',
-            pointerEvents: showSoundPicker ? 'none' : 'auto',
-            position: 'relative',
-            zIndex: 10,
-          }}
-        >
+        {/* Home UI — keep visible when sound sidebar is open; only right-side (theme + music button) hide */}
+        <div className="relative z-10">
           <HomeWrapper
           onTimerClick={handleTimerButtonClick}
           isTimerActive={isTimerActive}
@@ -598,34 +736,13 @@ export default function App() {
             albumArtUrl={allSongs.find(s => s.id === selectedSongId)?.imageUrl}
             audioPlayerRef={audioPlayerRef}
             onOpenSoundPicker={handleOpenSoundPicker}
+            onCloseSoundPicker={handleCloseSoundPicker}
             showWatchfacePicker={showWatchfacePicker}
+            showSoundPicker={showSoundPicker}
           />
         </HomeWrapper>
         </div>
 
-
-        {/* Watchface picker side panel */}
-        <WatchfacePickerPanel
-          isOpen={showWatchfacePicker}
-          onClose={handleCloseWatchfacePicker}
-          onSelectWatchface={handleSelectWatchface}
-          onPreviewBackground={setPreviewBackgroundIndex}
-          selectedWatchfaceIndex={selectedWatchfaceIndex}
-          themeMode={effectiveTheme}
-        />
-
-        {/* Sound picker modal */}
-        {showSoundPicker && (
-          <SoundPickerModal
-            isOpen={showSoundPicker}
-            onClose={handleCloseSoundPicker}
-            songs={allSongs}
-            onAddSong={handleAddSong}
-            onSelectSong={handleSelectSong}
-            onDeleteSong={handleDeleteSong}
-            selectedSongId={selectedSongId}
-          />
-        )}
 
         {/* Click feedback ripple - removed for simplicity */}
 
@@ -649,7 +766,25 @@ export default function App() {
         </div>
       </div>
 
-
+      {/* Panels at root so they are never clipped and always on top */}
+      <WatchfacePickerPanel
+        isOpen={showWatchfacePicker}
+        onClose={handleCloseWatchfacePicker}
+        onSelectWatchface={handleSelectWatchface}
+        onPreviewBackground={setPreviewBackgroundIndex}
+        selectedWatchfaceIndex={selectedWatchfaceIndex}
+        themeMode={effectiveTheme}
+      />
+      <MusicPickerPanel
+        isOpen={showSoundPicker}
+        onClose={handleCloseSoundPicker}
+        songs={allSongs}
+        onAddSong={handleAddSong}
+        onSelectSong={handleSelectSong}
+        onDeleteSong={handleDeleteSong}
+        selectedSongId={selectedSongId}
+        themeMode={effectiveTheme}
+      />
     </div>
   );
 }

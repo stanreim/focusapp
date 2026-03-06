@@ -62,12 +62,10 @@ export function TimerSelector({ onSelect, onCancel }: TimerSelectorProps) {
                 hapticSounds.thud();
                 onSelect(duration);
               }}
-              className={`${buttonSize} font-extralight text-white/80 hover:text-white hover:scale-110 transition-all duration-200 w-20 h-20 sm:w-24 sm:h-24 lg:w-32 lg:h-32 flex items-center justify-center rounded-full border border-white/20 hover:border-white/40 hover:bg-white/5`}
-              style={{
-                backdropFilter: 'blur(10px)',
-              }}
+              className={`${buttonSize} font-extralight text-[#6d6d6d] hover:text-[#4a4a4a] relative w-20 h-20 sm:w-24 sm:h-24 lg:w-32 lg:h-32 flex items-center justify-center rounded-[112px] shrink-0 transition-all duration-300 hover:scale-110 bg-white shadow-[0px_4px_8px_-3px_rgba(0,0,0,0.54)]`}
             >
               {duration}
+              <div className="absolute inset-0 pointer-events-none rounded-[inherit] shadow-[inset_2px_0px_12px_-3px_rgba(0,0,0,0.12),inset_0px_8px_9px_-7px_rgba(0,0,0,0.08)]" />
             </button>
           ))}
         </div>

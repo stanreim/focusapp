@@ -28,3 +28,4 @@ npm-debug.log*
 # Large media assets (optional - uncomment if you don't want to track them)
 # public/assets/*.mp4
 # public/assets/*.mp3
+.vercel
