@@ -344,7 +344,7 @@ export function TodoList({ themeMode }: { themeMode?: 'light' | 'dark' | 'color'
                  onChange={(e) => setEditText(e.target.value)}
                  onBlur={handleEditSave}
                  onKeyDown={handleEditKeyDown}
-                 className={`font-['SF_Pro:Medium',sans-serif] font-[510] text-xs sm:text-sm lg:text-[14px] bg-transparent border-none outline-none w-full p-0 m-0 h-auto leading-[normal] transition-colors duration-500 ${themeMode === 'light' ? 'text-black' : 'text-[#FFFFFF]'}`}
+                 className={`font-['SF_Pro:Medium',sans-serif] font-[510] text-[16px] sm:text-sm lg:text-[14px] bg-transparent border-none outline-none w-full p-0 m-0 h-auto leading-[normal] transition-colors duration-500 ${themeMode === 'light' ? 'text-black' : 'text-[#FFFFFF]'}`}
                  style={{ fontVariationSettings: "'wdth' 100" }}
                />
             ) : (
@@ -385,7 +385,7 @@ export function TodoList({ themeMode }: { themeMode?: 'light' | 'dark' | 'color'
                onBlur={handleAddTodo}
                onKeyDown={handleKeyDown}
                placeholder="Enter task..."
-               className={`font-['SF_Pro:Medium',sans-serif] font-[510] text-xs sm:text-sm lg:text-[14px] bg-transparent border-none outline-none w-full p-0 m-0 leading-[normal] transition-colors duration-500 ${themeMode === 'light' ? 'text-black placeholder:text-[#bdbdbd]' : 'text-[#FFFFFF] placeholder:text-[#FFFFFF]/60'}`}
+               className={`font-['SF_Pro:Medium',sans-serif] font-[510] text-[16px] sm:text-sm lg:text-[14px] bg-transparent border-none outline-none w-full p-0 m-0 leading-[normal] transition-colors duration-500 ${themeMode === 'light' ? 'text-black placeholder:text-[#bdbdbd]' : 'text-[#FFFFFF] placeholder:text-[#FFFFFF]/60'}`}
                style={{ fontVariationSettings: "'wdth' 100" }}
              />
            ) : (

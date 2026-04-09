@@ -733,11 +733,22 @@ function Table({ themeMode }: { themeMode?: 'light' | 'dark' | 'color' }) {
   );
 }
 
-function Tasks({ className, themeMode }: { className?: string; themeMode?: 'light' | 'dark' | 'color' }) {
+function Tasks({
+  className,
+  themeMode,
+  fullWidth = false,
+}: {
+  className?: string;
+  themeMode?: 'light' | 'dark' | 'color';
+  fullWidth?: boolean;
+}) {
   const isBright = themeMode === 'light';
   return (
     <div
-      className={className || "content-stretch flex flex-col relative rounded-[24px] w-full max-w-[265px] min-h-[178px] min-w-0 transition-all duration-500"}
+      className={
+        className ||
+        `content-stretch flex flex-col relative rounded-[24px] w-full min-h-[178px] min-w-0 transition-all duration-500 ${fullWidth ? '' : 'max-w-[265px]'}`
+      }
       data-name="Tasks"
       style={
         isBright
@@ -788,9 +799,9 @@ function TasksContainer({ themeMode }: { themeMode?: 'light' | 'dark' | 'color' 
 
 function MobileTasksCard() {
   return (
-    <div className="w-full pb-6 pt-2 flex justify-center" data-name="MobileTasksContainer">
-      <div className="content-stretch flex flex-col items-start p-2.5 relative w-full max-w-[285px] min-w-0">
-        <Tasks themeMode="light" />
+    <div className="w-full px-4 pb-6 pt-2" data-name="MobileTasksContainer">
+      <div className="content-stretch flex flex-col items-start relative w-full min-w-0">
+        <Tasks themeMode="light" fullWidth />
       </div>
     </div>
   );
@@ -1002,9 +1013,9 @@ export default function Home({
 
   if (isMobile) {
     return (
-      <div className="bg-transparent overflow-hidden relative w-full h-full min-h-screen" data-name="HomeMobile">
-        <div className="absolute inset-0 flex flex-col justify-between pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
-          <div className="w-full">
+      <div className="bg-transparent relative w-full h-full min-h-screen overflow-y-auto" data-name="HomeMobile">
+        <div className="w-full min-h-screen flex flex-col pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
+          <div className="w-full shrink-0">
             <GreetingHeader
               themeMode="light"
               watchfaceBackgroundIndex={0}
@@ -1012,7 +1023,7 @@ export default function Home({
             />
           </div>
 
-          <div className="relative flex-1 min-h-[300px]" data-name="ClockMobile">
+          <div className="relative shrink-0 h-[320px]" data-name="ClockMobile">
             <Clock
               themeMode="light"
               isTimerActive={false}
@@ -1021,7 +1032,9 @@ export default function Home({
             />
           </div>
 
-          <MobileTasksCard />
+          <div className="shrink-0 mt-3">
+            <MobileTasksCard />
+          </div>
         </div>
       </div>
     );
