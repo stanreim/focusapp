@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
 import { AudioPlayer, AudioPlayerRef } from '@/app/components/AudioPlayer';
 import { HomeWrapper } from '@/app/components/HomeWrapper';
-import { MusicPickerPanel } from '@/app/components/MusicPickerPanel';
 import { WatchfacePickerPanel } from '@/app/components/WatchfacePickerPanel';
+import { MenuFlyoutModal, type MenuFlyoutAnchor } from '@/app/components/MenuFlyoutModal';
+import { SoundPickerFlyoutModal, type SoundFlyoutAnchor } from '@/app/components/SoundPickerFlyoutModal';
 import BlurTextAnimation from '@/components/ui/blur-text-animation';
 import Home from '@/imports/Home-7-86';
 import { hapticSounds } from '@/app/hooks/useHapticSound';
@@ -20,19 +21,21 @@ interface Song {
 // Build ID – visible on the page so you can confirm the deployed version
 const BUILD_ID = '2.0';
 
-// Backgrounds use same numeric indices as watchfaces: assets/Backgrounds/Background-0.png … Background-4.png
-const WATCHFACE_BACKGROUND_IDS = [0, 1, 2, 3, 4] as const;
+// Backgrounds use same numeric indices as watchfaces: Background-0 (none) … Background-5.png
+const WATCHFACE_BACKGROUND_IDS = [0, 1, 2, 3, 4, 5] as const;
+const WATCHFACE_LAST_INDEX = WATCHFACE_BACKGROUND_IDS.length - 1;
 const BACKGROUNDS: (string | null)[] = WATCHFACE_BACKGROUND_IDS.map((i) =>
   i === 0 ? null : `/assets/Backgrounds/Background-${i}.png`
 );
 
-// Watchface index (0–4) → theme. Hover previews and selection apply this theme to the watch and UI.
+// Watchface index → theme. Hover previews and selection apply this theme to the watch and UI.
 const WATCHFACE_THEMES: ('light' | 'dark' | 'color')[] = [
   'light',  // 0
   'dark',   // 1
   'color',  // 2
   'dark',   // 3
   'color',  // 4
+  'dark',   // 5 — same clock dial as 1–4 (gradient ring, white markers/hands); uiTheme still light for chrome
 ];
 
 // Loading screen greetings — rotate one per day (day-of-year % 5) to set focus and calm.
@@ -68,7 +71,7 @@ export default function App() {
       const saved = localStorage.getItem('zenoApp_selectedWatchfaceIndex');
       if (saved == null) return 'light';
       const n = parseInt(saved, 10);
-      const index = Number.isNaN(n) ? 0 : Math.min(Math.max(0, n), 4);
+      const index = Number.isNaN(n) ? 0 : Math.min(Math.max(0, n), WATCHFACE_LAST_INDEX);
       return WATCHFACE_THEMES[index];
     } catch {
       return 'light';
@@ -88,6 +91,9 @@ export default function App() {
   const volumeRef = useRef(volume);
   const isMutedRef = useRef(isMuted);
   const [showSoundPicker, setShowSoundPicker] = useState(false);
+  const [soundFlyoutAnchor, setSoundFlyoutAnchor] = useState<SoundFlyoutAnchor | null>(null);
+  const [showMenuFlyout, setShowMenuFlyout] = useState(false);
+  const [menuFlyoutAnchor, setMenuFlyoutAnchor] = useState<MenuFlyoutAnchor | null>(null);
   const [showWatchfacePicker, setShowWatchfacePicker] = useState(false);
   const [previewBackgroundIndex, setPreviewBackgroundIndex] = useState<number | null>(null);
   const [selectedWatchfaceIndex, setSelectedWatchfaceIndex] = useState<number>(() => {
@@ -95,7 +101,7 @@ export default function App() {
       const saved = localStorage.getItem('zenoApp_selectedWatchfaceIndex');
       if (saved == null) return 0;
       const n = parseInt(saved, 10);
-      return Number.isNaN(n) ? 0 : Math.min(Math.max(0, n), 4);
+      return Number.isNaN(n) ? 0 : Math.min(Math.max(0, n), WATCHFACE_LAST_INDEX);
     } catch {
       return 0;
     }
@@ -162,10 +168,15 @@ export default function App() {
   // Helper function to generate consistent image URL for songs
   const getSongImageUrl = (songId: string, songName: string): string => {
     const FALLBACK_IMAGES = [
-      "https://images.unsplash.com/photo-1760346738721-235e811f573d?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxsby1maSUyMGFic3RyYWN0JTIwYmFja2dyb3VuZHxlbnwxfHx8fDE3Njk4MDYxMzF8MA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral",
-      "https://images.unsplash.com/photo-1736176421274-546a4eaf57d6?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxhYnN0cmFjdCUyMG11c2ljJTIwd2F2ZWZvcm1zJTIwZ3JhZGllbnR8ZW58MXx8fHwxNzY5ODA2MTMxfDA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral",
-      "https://images.unsplash.com/photo-1765046255479-669cf07a0230?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxtaW5pbWFsaXN0JTIwc291bmQlMjB3YXZlc3xlbnwxfHx8fDE3Njk4MDYxMzF8MA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral",
-      "https://images.unsplash.com/photo-1682943827405-6261f5540d68?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxhYnN0cmFjdCUyMGF1ZGlvJTIwc3BlY3RydW18ZW58MXx8fHwxNzY5ODA2MTMxfDA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral"
+      "https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=900&q=80",
+      "https://images.unsplash.com/photo-1516117172878-fd2c41f4a759?auto=format&fit=crop&w=900&q=80",
+      "https://images.unsplash.com/photo-1528459801416-a9e53bbf4e17?auto=format&fit=crop&w=900&q=80",
+      "https://images.unsplash.com/photo-1465101046530-73398c7f28ca?auto=format&fit=crop&w=900&q=80",
+      "https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=900&q=80",
+      "https://images.unsplash.com/photo-1760346738721-235e811f573d?auto=format&fit=crop&w=900&q=80",
+      "https://images.unsplash.com/photo-1736176421274-546a4eaf57d6?auto=format&fit=crop&w=900&q=80",
+      "https://images.unsplash.com/photo-1765046255479-669cf07a0230?auto=format&fit=crop&w=900&q=80",
+      "https://images.unsplash.com/photo-1682943827405-6261f5540d68?auto=format&fit=crop&w=900&q=80"
     ];
     let hash = 0;
     const str = songId || songName || 'default';
@@ -177,47 +188,71 @@ export default function App() {
     return FALLBACK_IMAGES[index];
   };
 
-  // Create song list for picker - using actual audio files from assets. Subtitles from top to bottom: Calm, Focused, Energised, Funky, Brazilian moods.
+  // Create song list for picker using audio files in public/assets.
   const allSongs: Song[] = [
     {
       id: 'song-1',
-      name: '3 Petits Bouts de Choux (Cover)',
+      name: 'Calm',
       duration: '∞',
-      audioUrl: '/assets/3 Petits Bouts de Choux (Cover).mp3',
-      imageUrl: getSongImageUrl('song-1', '3 Petits Bouts de Choux (Cover)'),
+      audioUrl: '/assets/Calm.mp3',
+      imageUrl: getSongImageUrl('song-1', 'Calm'),
       subtitle: 'Calm',
     },
     {
       id: 'song-2',
-      name: 'Dreams of Glass',
+      name: 'Rain',
       duration: '∞',
-      audioUrl: '/assets/Dreams of Glass.mp3',
-      imageUrl: getSongImageUrl('song-2', 'Dreams of Glass'),
+      audioUrl: '/assets/Rain.mp3',
+      imageUrl: getSongImageUrl('song-2', 'Rain'),
       subtitle: 'Focused',
     },
     {
       id: 'song-3',
-      name: 'Vive le Plein air',
+      name: 'Ocean',
       duration: '∞',
-      audioUrl: '/assets/Vive le Plein air.mp3',
-      imageUrl: getSongImageUrl('song-3', 'Vive le Plein air'),
+      audioUrl: '/assets/Ocean.mp3',
+      imageUrl: getSongImageUrl('song-3', 'Ocean'),
       subtitle: 'Energised',
     },
     {
       id: 'song-4',
-      name: 'Funcky Day Cover',
+      name: 'Fireplace',
       duration: '∞',
-      audioUrl: '/assets/Funcky Day Cover.mp3',
-      imageUrl: getSongImageUrl('song-4', 'Funcky Day Cover'),
+      audioUrl: '/assets/Fireplace.mp3',
+      imageUrl: getSongImageUrl('song-4', 'Fireplace'),
       subtitle: 'Funky',
     },
     {
       id: 'song-5',
-      name: 'Sabe Jogar Cover',
+      name: 'Piano',
       duration: '∞',
-      audioUrl: '/assets/Sabe Jogar Cover.mp3',
-      imageUrl: getSongImageUrl('song-5', 'Sabe Jogar Cover'),
+      audioUrl: '/assets/Piano.mp3',
+      imageUrl: getSongImageUrl('song-5', 'Piano'),
       subtitle: 'Brazilian moods',
+    },
+    {
+      id: 'song-6',
+      name: 'Handpan',
+      duration: '∞',
+      audioUrl: '/assets/Handpan.mp3',
+      imageUrl: getSongImageUrl('song-6', 'Handpan'),
+      subtitle: 'Calm',
+    },
+    {
+      id: 'song-7',
+      name: 'Energised',
+      duration: '∞',
+      audioUrl: '/assets/Energised.mp3',
+      imageUrl: getSongImageUrl('song-7', 'Energised'),
+      subtitle: 'Energised',
+    },
+    {
+      id: 'song-8',
+      name: 'Brazilian Vibes',
+      duration: '∞',
+      audioUrl: '/assets/Brazilian Vibes.mp3',
+      imageUrl: getSongImageUrl('song-8', 'Brazilian Vibes'),
+      subtitle: 'Brazilian Vibes',
     },
     ...customSongs,
   ];
@@ -425,24 +460,43 @@ export default function App() {
     });
   };
 
-  const handleOpenSoundPicker = () => {
+  const handleOpenSoundPicker = (buttonRect?: DOMRect) => {
     hapticSounds.click();
+    if (buttonRect) {
+      setSoundFlyoutAnchor({
+        top: buttonRect.top,
+        left: buttonRect.left,
+        right: buttonRect.right,
+        bottom: buttonRect.bottom,
+      });
+    } else if (typeof window !== 'undefined') {
+      // Long-press opens without a trigger rect: pin near bottom-right controls.
+      setSoundFlyoutAnchor({
+        top: window.innerHeight - 24,
+        left: window.innerWidth - 72,
+        right: window.innerWidth - 24,
+        bottom: window.innerHeight - 24,
+      });
+    }
     setShowSoundPicker(true);
+  };
+
+  const handleCloseWatchfacePicker = () => {
+    setShowWatchfacePicker(false);
+    setPreviewBackgroundIndex(null);
   };
 
   const handleOpenWatchfacePicker = () => {
     hapticSounds.click();
+    if (showWatchfacePicker) {
+      handleCloseWatchfacePicker();
+      return;
+    }
     const current = selectedWatchfaceIndex;
     panelOpenAtWatchfaceRef.current = current;
     setPreviewBackgroundIndex(current);
     setThemeMode(WATCHFACE_THEMES[current]);
     setShowWatchfacePicker(true);
-  };
-
-
-  const handleCloseWatchfacePicker = () => {
-    setShowWatchfacePicker(false);
-    setPreviewBackgroundIndex(null);
   };
 
   const handleSelectWatchface = (index: number) => {
@@ -453,12 +507,13 @@ export default function App() {
 
   const handleCloseSoundPicker = () => {
     setShowSoundPicker(false);
+    setSoundFlyoutAnchor(null);
   };
 
   const handleAddSong = (song: Song) => {
     setCustomSongs([...customSongs, song]);
     setSelectedSongId(song.id);
-    setShowSoundPicker(false);
+    handleCloseSoundPicker();
     // Auto-play when adding a custom song
     if (!isPlaying) {
       setIsPlaying(true);
@@ -467,7 +522,7 @@ export default function App() {
 
   const handleSelectSong = (songId: string) => {
     setSelectedSongId(songId);
-    setShowSoundPicker(false);
+    handleCloseSoundPicker();
     // Always start playing when a song is selected from the picker
     if (!isPlaying) {
       setIsPlaying(true);
@@ -522,6 +577,8 @@ export default function App() {
   selectedSongIdRef.current = selectedSongId;
   volumeRef.current = volume;
   isMutedRef.current = isMuted;
+
+  const soundPickerSongs = allSongs;
 
   // Don't trigger keyboard shortcuts when user is typing in an input
   const isTypingInInput = () => {
@@ -630,9 +687,11 @@ export default function App() {
   const effectiveTheme = showWatchfacePicker
     ? WATCHFACE_THEMES[effectiveBackgroundIndex]
     : themeMode;
-  // Watchface 1–4: use bright (light) theme for all UI; watchface 0 unchanged
+  // Watchface 1–5: use bright (light) theme for all UI; watchface 0 unchanged
   const uiTheme =
-    effectiveBackgroundIndex >= 1 && effectiveBackgroundIndex <= 4 ? 'light' : effectiveTheme;
+    effectiveBackgroundIndex >= 1 && effectiveBackgroundIndex <= WATCHFACE_LAST_INDEX
+      ? 'light'
+      : effectiveTheme;
 
   return (
     <div 
@@ -661,7 +720,7 @@ export default function App() {
         aria-hidden
       />
       {/* No theme overlay on watchphase backgrounds — show images as-is */}
-      {/* Loading Overlay — uses uiTheme so watchface 1–4 show bright loading */}
+      {/* Loading Overlay — uses uiTheme so watchface 1–5 show bright loading */}
       <div 
         className={`absolute inset-0 z-[100] transition-opacity duration-1000 ease-in-out ${
           uiTheme === 'dark' ? 'bg-[#111]' : 
@@ -680,7 +739,7 @@ export default function App() {
                   'bg-[#EAEAEA]'
                 }
                 textColor={uiTheme === 'light' ? 'text-black/80' : 'text-white/80'}
-                fontSize="text-2xl md:text-3xl font-light tracking-widest"
+                fontSize="text-2xl md:text-3xl font-light tracking-[0em]"
             />
         )}
       </div>
@@ -739,6 +798,15 @@ export default function App() {
             onCloseSoundPicker={handleCloseSoundPicker}
             showWatchfacePicker={showWatchfacePicker}
             showSoundPicker={showSoundPicker}
+            watchfaceBackgroundIndex={effectiveBackgroundIndex}
+            onMenuClick={(rect) => {
+              setMenuFlyoutAnchor({
+                top: rect.top,
+                left: rect.left,
+                bottom: rect.bottom,
+              });
+              setShowMenuFlyout(true);
+            }}
           />
         </HomeWrapper>
         </div>
@@ -775,15 +843,21 @@ export default function App() {
         selectedWatchfaceIndex={selectedWatchfaceIndex}
         themeMode={effectiveTheme}
       />
-      <MusicPickerPanel
+      <SoundPickerFlyoutModal
         isOpen={showSoundPicker}
         onClose={handleCloseSoundPicker}
-        songs={allSongs}
-        onAddSong={handleAddSong}
+        anchor={soundFlyoutAnchor}
+        songs={soundPickerSongs}
         onSelectSong={handleSelectSong}
-        onDeleteSong={handleDeleteSong}
         selectedSongId={selectedSongId}
-        themeMode={effectiveTheme}
+      />
+      <MenuFlyoutModal
+        isOpen={showMenuFlyout}
+        anchor={menuFlyoutAnchor}
+        onClose={() => {
+          setShowMenuFlyout(false);
+          setMenuFlyoutAnchor(null);
+        }}
       />
     </div>
   );

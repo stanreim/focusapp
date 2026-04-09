@@ -22,26 +22,34 @@ export function LiveClock({ isTimerActive, timeRemaining, draggedMinutes, themeM
     return () => clearInterval(interval);
   }, [isTimerActive, draggedMinutes]);
 
-  let hours: number, minutes: number, seconds: number;
+  let hourAngle: number;
+  let minuteAngle: number;
 
   if (isTimerActive && timeRemaining != null) {
     const totalSeconds = Math.ceil(timeRemaining / 1000);
-    hours = Math.floor(totalSeconds / 3600);
-    minutes = Math.floor((totalSeconds % 3600) / 60);
-    seconds = totalSeconds % 60;
+    const now = new Date();
+    const wallH = now.getHours() % 12;
+    const wallM = now.getMinutes();
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
+    // Keep hour hand pinned to real clock time during focus countdown.
+    hourAngle = wallH * 30 + wallM * 0.5 - 90;
+    minuteAngle = (minutes * 6) + (seconds * 0.1) - 90;
   } else if (draggedMinutes != null) {
-    minutes = draggedMinutes;
-    hours = Math.floor(minutes / 60) % 12;
-    seconds = 0;
+    // Minute hand = focus duration (0–59); hour hand stays on real time so it never leaves the current hour.
+    const now = new Date();
+    const wallH = now.getHours() % 12;
+    const wallM = now.getMinutes();
+    hourAngle = wallH * 30 + wallM * 0.5 - 90;
+    minuteAngle = draggedMinutes * 6 - 90;
   } else {
-    // Current time: hour, minute, second from system clock
-    hours = time.getHours() % 12;
-    minutes = time.getMinutes();
-    seconds = time.getSeconds();
+    const hours = time.getHours() % 12;
+    const minutes = time.getMinutes();
+    const seconds = time.getSeconds();
+    hourAngle = (hours * 30) + (minutes * 0.5) - 90;
+    minuteAngle = (minutes * 6) + (seconds * 0.1) - 90;
   }
 
-  const hourAngle = (hours * 30) + (minutes * 0.5) - 90;
-  const minuteAngle = (minutes * 6) + (seconds * 0.1) - 90;
   const isDragging = draggedMinutes != null;
 
   // Figma 61-1208 (watchphases 1–5): Line 5 & 6 solid white; light = black

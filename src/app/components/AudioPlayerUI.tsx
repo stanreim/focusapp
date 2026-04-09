@@ -123,7 +123,8 @@ function VinylArtwork({
       <div
         className="size-full"
         style={{
-          animation: isPlaying ? 'vinyl-rotate 8s linear infinite' : 'none',
+          animation: 'vinyl-rotate 8s linear infinite',
+          animationPlayState: isPlaying ? 'running' : 'paused',
           transformOrigin: 'center center',
         }}
       >

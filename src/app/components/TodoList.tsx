@@ -45,16 +45,27 @@ export function TodoList({ themeMode }: { themeMode?: 'light' | 'dark' | 'color'
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editText, setEditText] = useState('');
   
-  // Drag state using pointer events
+  // Drag state with whole-row drag + safeguards
   const [draggedId, setDraggedId] = useState<string | null>(null);
-  const [dragOverId, setDragOverId] = useState<string | null>(null);
-  const pointerStartRef = useRef<{ x: number; y: number; id: string | null }>({ x: 0, y: 0, id: null });
-  const isDraggingRef = useRef(false);
-  const dragThreshold = 8; // pixels before drag starts
+  const [isDragging, setIsDragging] = useState(false);
+  const dragPointerIdRef = useRef<number | null>(null);
+  const draggedIdRef = useRef<string | null>(null);
+  const lastHoverIndexRef = useRef<number | null>(null);
+  const dragStartYRef = useRef<number>(0);
+  const didReorderRef = useRef(false);
+  const dragHoldTimerRef = useRef<number | null>(null);
+  const pendingPointerIdRef = useRef<number | null>(null);
+  const pendingRowElRef = useRef<HTMLElement | null>(null);
+  const pendingTodoIdRef = useRef<string | null>(null);
   
   const inputRef = useRef<HTMLInputElement>(null);
   const editInputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
+  const todosRef = useRef<Todo[]>(todos);
+
+  useEffect(() => {
+    todosRef.current = todos;
+  }, [todos]);
 
   useEffect(() => {
     if (isAdding && inputRef.current) {
@@ -142,91 +153,133 @@ export function TodoList({ themeMode }: { themeMode?: 'light' | 'dark' | 'color'
     setEditText(todo.text);
   };
 
-  // Unified pointer-based drag handlers (works for both mouse and touch)
-  const handlePointerDown = useCallback((e: React.PointerEvent, id: string) => {
-    // Prevent parent handlers (audio selection)
+  const moveTodo = useCallback((sourceId: string, targetIndex: number) => {
+    setTodos((prevTodos) => {
+      const sourceIndex = prevTodos.findIndex((t) => t.id === sourceId);
+      if (sourceIndex === -1 || targetIndex < 0 || targetIndex >= prevTodos.length || sourceIndex === targetIndex) {
+        return prevTodos;
+      }
+      const next = [...prevTodos];
+      const [moved] = next.splice(sourceIndex, 1);
+      next.splice(targetIndex, 0, moved);
+      return next;
+    });
+  }, []);
+
+  const getHoverIndex = useCallback((clientY: number): number | null => {
+    if (!listRef.current) return null;
+    const rows = Array.from(listRef.current.querySelectorAll<HTMLElement>('[data-task-id]'));
+    if (rows.length === 0) return null;
+
+    for (let i = 0; i < rows.length; i += 1) {
+      const rect = rows[i].getBoundingClientRect();
+      const midpoint = rect.top + rect.height / 2;
+      if (clientY < midpoint) return i;
+    }
+    return rows.length - 1;
+  }, []);
+
+  const clearDragHoldTimer = useCallback(() => {
+    if (dragHoldTimerRef.current != null) {
+      window.clearTimeout(dragHoldTimerRef.current);
+      dragHoldTimerRef.current = null;
+    }
+  }, []);
+
+  const beginDrag = useCallback((pointerId: number, rowEl: HTMLElement, id: string) => {
+    dragPointerIdRef.current = pointerId;
+    draggedIdRef.current = id;
+    lastHoverIndexRef.current = todosRef.current.findIndex((t) => t.id === id);
+    didReorderRef.current = false;
+    setDraggedId(id);
+    setIsDragging(true);
+    hapticSounds.click();
+    rowEl.setPointerCapture(pointerId);
+  }, []);
+
+  const handleRowPointerDown = useCallback((e: React.PointerEvent, id: string) => {
     e.stopPropagation();
-    
-    // Don't start drag on checkbox or delete button
+
     const target = e.target as HTMLElement;
-    if (target.closest('[data-name="Checkmark"]') || target.closest('button')) {
+    if (
+      target.closest('input') ||
+      target.closest('textarea') ||
+      target.closest('button') ||
+      target.closest('[data-name="Checkmark"]')
+    ) {
       return;
     }
-    
-    pointerStartRef.current = { 
-      x: e.clientX, 
-      y: e.clientY,
-      id: id
-    };
-    isDraggingRef.current = false;
-    
-    // Capture pointer to receive events even outside element
-    (e.target as HTMLElement).setPointerCapture(e.pointerId);
-  }, []);
 
-  const handlePointerMove = useCallback((e: React.PointerEvent) => {
-    if (!pointerStartRef.current.id) return;
-    
-    const deltaX = Math.abs(e.clientX - pointerStartRef.current.x);
-    const deltaY = Math.abs(e.clientY - pointerStartRef.current.y);
-    
-    // Start dragging once we move past threshold
-    if (!isDraggingRef.current && (deltaX > dragThreshold || deltaY > dragThreshold)) {
-      isDraggingRef.current = true;
-      setDraggedId(pointerStartRef.current.id);
-      hapticSounds.click();
-    }
+    dragStartYRef.current = e.clientY;
+    pendingPointerIdRef.current = e.pointerId;
+    pendingRowElRef.current = e.currentTarget as HTMLElement;
+    pendingTodoIdRef.current = id;
+    clearDragHoldTimer();
+    dragHoldTimerRef.current = window.setTimeout(() => {
+      const pointerId = pendingPointerIdRef.current;
+      const rowEl = pendingRowElRef.current;
+      const todoId = pendingTodoIdRef.current;
+      if (pointerId == null || !rowEl || !todoId || isDragging) return;
+      beginDrag(pointerId, rowEl, todoId);
+      dragHoldTimerRef.current = null;
+    }, 140);
+  }, [beginDrag, clearDragHoldTimer, isDragging]);
 
-    // If we're dragging, find which task we're over
-    if (isDraggingRef.current && listRef.current) {
-      const taskElements = listRef.current.querySelectorAll('[data-task-id]');
-      
-      for (const el of taskElements) {
-        const rect = el.getBoundingClientRect();
-        if (e.clientY >= rect.top && e.clientY <= rect.bottom) {
-          const targetId = el.getAttribute('data-task-id');
-          if (targetId && targetId !== pointerStartRef.current.id) {
-            setDragOverId(targetId);
-          } else {
-            setDragOverId(null);
-          }
-          break;
-        }
+  const handleRowPointerMove = useCallback((e: React.PointerEvent, id: string) => {
+    e.stopPropagation();
+
+    // Allow quick drag start when user moves decisively before hold delay.
+    if (!isDragging && dragHoldTimerRef.current != null) {
+      const movedY = Math.abs(e.clientY - dragStartYRef.current);
+      if (movedY >= 10) {
+        clearDragHoldTimer();
+        beginDrag(e.pointerId, e.currentTarget as HTMLElement, id);
       }
     }
-  }, []);
 
-  const handlePointerUp = useCallback((e: React.PointerEvent) => {
+    if (!isDragging || dragPointerIdRef.current !== e.pointerId || !draggedIdRef.current) return;
+    e.preventDefault();
+
+    const hoverIndex = getHoverIndex(e.clientY);
+    if (hoverIndex == null || hoverIndex === lastHoverIndexRef.current) return;
+
+    moveTodo(draggedIdRef.current, hoverIndex);
+    lastHoverIndexRef.current = hoverIndex;
+    didReorderRef.current = true;
+  }, [beginDrag, clearDragHoldTimer, getHoverIndex, isDragging, moveTodo]);
+
+  const finishDrag = useCallback((e: React.PointerEvent) => {
+    clearDragHoldTimer();
     e.stopPropagation();
-    
-    const sourceId = pointerStartRef.current.id;
-    
-    // If we were dragging and have a target, reorder
-    if (isDraggingRef.current && sourceId && dragOverId && sourceId !== dragOverId) {
-      hapticSounds.tick();
-      setTodos(prevTodos => {
-        const sourceIndex = prevTodos.findIndex(t => t.id === sourceId);
-        const targetIndex = prevTodos.findIndex(t => t.id === dragOverId);
-        
-        if (sourceIndex === -1 || targetIndex === -1) return prevTodos;
-        
-        const newTodos = [...prevTodos];
-        const [removed] = newTodos.splice(sourceIndex, 1);
-        newTodos.splice(targetIndex, 0, removed);
-        
-        return newTodos;
-      });
+    if (dragPointerIdRef.current === e.pointerId) {
+      e.preventDefault();
+      if (didReorderRef.current) {
+        hapticSounds.tick();
+      }
     }
 
-    // Reset state
-    isDraggingRef.current = false;
-    pointerStartRef.current = { x: 0, y: 0, id: null };
+    dragPointerIdRef.current = null;
+    draggedIdRef.current = null;
+    lastHoverIndexRef.current = null;
+    dragStartYRef.current = 0;
+    didReorderRef.current = false;
+    pendingPointerIdRef.current = null;
+    pendingRowElRef.current = null;
+    pendingTodoIdRef.current = null;
     setDraggedId(null);
-    setDragOverId(null);
-    
-    // Release pointer capture
-    (e.target as HTMLElement).releasePointerCapture(e.pointerId);
-  }, [dragOverId]);
+    setIsDragging(false);
+
+    const row = e.currentTarget as HTMLElement;
+    if (row.hasPointerCapture(e.pointerId)) {
+      row.releasePointerCapture(e.pointerId);
+    }
+  }, [clearDragHoldTimer]);
+
+  useEffect(() => {
+    return () => {
+      clearDragHoldTimer();
+    };
+  }, [clearDragHoldTimer]);
 
   // Prevent parent handlers from triggering on the todo container
   const handleContainerPointerDown = useCallback((e: React.PointerEvent) => {
@@ -244,16 +297,12 @@ export function TodoList({ themeMode }: { themeMode?: 'light' | 'dark' | 'color'
         <div 
           key={todo.id}
           data-task-id={todo.id}
-          onPointerDown={(e) => handlePointerDown(e, todo.id)}
-          onPointerMove={handlePointerMove}
-          onPointerUp={handlePointerUp}
-          onPointerCancel={handlePointerUp}
-          className={`content-stretch flex gap-2 items-start relative shrink-0 group w-full min-h-[24px] transition-all duration-150 touch-none select-none ${
+          onPointerDown={(e) => handleRowPointerDown(e, todo.id)}
+          onPointerMove={(e) => handleRowPointerMove(e, todo.id)}
+          onPointerUp={finishDrag}
+          onPointerCancel={finishDrag}
+          className={`content-stretch flex gap-2 items-start relative shrink-0 group w-full min-h-[24px] transition-all duration-150 select-none touch-none ${
             draggedId === todo.id ? 'opacity-50 scale-[1.02]' : ''
-          } ${
-            dragOverId === todo.id && draggedId !== todo.id
-              ? (themeMode === 'light' ? 'bg-black/5 rounded' : 'bg-white/10 rounded')
-              : ''
           }`}
           data-name="Task"
         >

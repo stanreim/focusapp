@@ -1,15 +1,15 @@
 // Watchface Picker Side Panel — Figma 61-4364 (Sidepanel frame)
 import { useEffect, useRef, useState } from 'react';
 
-const WATCHFACE_IDS = [0, 1, 2, 3, 4] as const;
+const WATCHFACE_IDS = [0, 1, 2, 3, 4, 5] as const;
 const WATCHFACE_IMAGES = WATCHFACE_IDS.map((i) => `/assets/Watchfaces/Watchface-${i}.png`);
 
-// From Figma: Sidepanel 282×1000, layoutMode VERTICAL, itemSpacing 16, fills []
+// Sidepanel: cards +20% vs prior 117×88; vertical list, itemSpacing 24, flush right with 24px screen inset
 const PANEL_WIDTH = 282;
-const CARD_WIDTH = 234;
-const CARD_HEIGHT = 176;
+const CARD_WIDTH = Math.round(117 * 1.2);
+const CARD_HEIGHT = Math.round(88 * 1.2);
 const PADDING_H = 24;
-const ITEM_SPACING = 16;
+const ITEM_SPACING = 24;
 const CARD_STAGGER_MS = 100;
 // 1.3s entrance: opacity 0 → 1 (transparent to fully visible) for smooth fade-in
 const CARD_ANIMATION_MS = 1300;
@@ -125,6 +125,7 @@ export function WatchfacePickerPanel({
       <aside
         ref={panelRef}
         className="fixed top-0 right-0 z-50 h-full flex flex-col overflow-y-auto"
+      onMouseLeave={() => onPreviewBackground?.(selectedWatchfaceIndex)}
       style={{
         width: PANEL_WIDTH,
         transform: slidIn ? 'translateX(0)' : 'translateX(100%)',
@@ -133,11 +134,14 @@ export function WatchfacePickerPanel({
         paddingRight: 'max(24px, env(safe-area-inset-right))',
         paddingBottom: 'max(24px, env(safe-area-inset-bottom))',
         paddingLeft: PADDING_H,
-        gap: ITEM_SPACING,
       }}
       role="dialog"
       aria-label="Choose watchface"
     >
+      <div
+        className="flex w-full flex-1 flex-col items-end justify-center"
+        style={{ gap: ITEM_SPACING }}
+      >
       {WATCHFACE_IDS.map((index) => {
         const visible = isExiting ? false : cardsVisible;
         const delayMs = isExiting
@@ -155,10 +159,9 @@ export function WatchfacePickerPanel({
               requestClose();
             }}
             onMouseEnter={() => onPreviewBackground?.(index)}
-            onMouseLeave={() => onPreviewBackground?.(selectedWatchfaceIndex)}
             aria-pressed={isSelected}
             aria-label={`Watchface ${index + 1}${isSelected ? ' (selected)' : ''}`}
-            className="overflow-hidden rounded-lg border-2 border-transparent outline-none shadow-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-transparent focus-visible:ring-white/50 shrink-0 self-stretch origin-right transition-transform active:scale-[0.98] [box-shadow:none]"
+            className="overflow-hidden rounded-lg border-2 border-transparent outline-none shadow-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-transparent focus-visible:ring-white/50 shrink-0 origin-right transition-transform active:scale-[0.98] [box-shadow:none]"
             style={{
               width: CARD_WIDTH,
               height: CARD_HEIGHT,
@@ -176,11 +179,12 @@ export function WatchfacePickerPanel({
             <img
               src={WATCHFACE_IMAGES[index]}
               alt={`Watchface ${index + 1}`}
-              className="w-full h-full object-cover"
+              className="w-full h-full object-contain"
             />
           </button>
         );
       })}
+      </div>
     </aside>
     </>
   );
